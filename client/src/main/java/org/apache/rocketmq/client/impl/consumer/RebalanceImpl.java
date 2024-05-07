@@ -98,6 +98,7 @@ public abstract class RebalanceImpl {
     }
 
     // 释放processQueueTable中包含的所有mq（也就是当前消费者消费的所有mq）的分布式锁
+    // oneway的含义是只管发送不管有没有接收到
     public void unlockAll(final boolean oneway) {
         // 将mq按broker分组
         HashMap<String, Set<MessageQueue>> brokerMqs = this.buildProcessQueueTableByBrokerName();
@@ -243,20 +244,21 @@ public abstract class RebalanceImpl {
         return true;
     }
 
+    // isorder的含义是 是否是顺序消费
     public boolean doRebalance(final boolean isOrder) {
         boolean balanced = true;
         Map<String, SubscriptionData> subTable = this.getSubscriptionInner();
         if (subTable != null) {
-            // 按主题维度进行
             for (final Map.Entry<String, SubscriptionData> entry : subTable.entrySet()) {
                 final String topic = entry.getKey();
                 try {
+                    // topic设置为由broker进行重平衡时，从broker端获取重平衡的结果
                     if (!clientRebalance(topic) && tryQueryAssignment(topic)) {
                         boolean result = this.getRebalanceResultFromBroker(topic, isOrder);
                         if (!result) {
                             balanced = false;
                         }
-                    } else {
+                    } else { // 否则由client端进行重平衡
                         boolean result = this.rebalanceByTopic(topic, isOrder);
                         if (!result) {
                             balanced = false;
@@ -271,7 +273,7 @@ public abstract class RebalanceImpl {
             }
         }
 
-        // 清除非订阅的主题的mq
+        // 清除processQueueTable里非订阅主题的mq & 移除topicClientRebalance里非订阅主题
         this.truncateMessageQueueNotMyTopic();
 
         return balanced;
@@ -313,9 +315,11 @@ public abstract class RebalanceImpl {
         return subscriptionInner;
     }
 
+    // client实现的topic维度的重平衡
     private boolean rebalanceByTopic(final String topic, final boolean isOrder) {
         boolean balanced = true;
         switch (messageModel) {
+            // 广播模式下，直接将topic所有的mq都分配给当前consumer
             case BROADCASTING: {
                 Set<MessageQueue> mqSet = this.topicSubscribeInfoTable.get(topic);
                 if (mqSet != null) {
@@ -332,6 +336,7 @@ public abstract class RebalanceImpl {
                 }
                 break;
             }
+            // 集群模式下，按设定的分配策略来进行分配
             case CLUSTERING: {
                 Set<MessageQueue> mqSet = this.topicSubscribeInfoTable.get(topic);
                 List<String> cidAll = this.mQClientFactory.findConsumerIdList(topic, consumerGroup);
@@ -350,6 +355,7 @@ public abstract class RebalanceImpl {
                     List<MessageQueue> mqAll = new ArrayList<>();
                     mqAll.addAll(mqSet);
 
+                    // 将topic的队列和消费组consumer进行排序，减少不同consumer进行重平衡的不一致问题
                     Collections.sort(mqAll);
                     Collections.sort(cidAll);
 
@@ -372,6 +378,7 @@ public abstract class RebalanceImpl {
                         allocateResultSet.addAll(allocateResult);
                     }
 
+                    // 更新processQueueTable
                     boolean changed = this.updateProcessQueueTableInRebalance(topic, allocateResultSet, isOrder);
                     if (changed) {
                         log.info(
@@ -487,6 +494,7 @@ public abstract class RebalanceImpl {
         }
     }
 
+    // 移除不再分配给当前consumer的mq，新加新分配给当前consumer的queue的ProcessQueue
     private boolean updateProcessQueueTableInRebalance(final String topic, final Set<MessageQueue> mqSet,
         final boolean isOrder) {
         boolean changed = false;
@@ -560,6 +568,7 @@ public abstract class RebalanceImpl {
 
         }
 
+        // 存在processQueue加锁失败的情况下（加分布式锁失败），等待500ms后再进行一次rebalance
         if (!allMQLocked) {
             mQClientFactory.rebalanceLater(500);
         }

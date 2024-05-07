@@ -111,6 +111,7 @@ public class RebalancePushImpl extends RebalanceImpl {
         try {
             // unlock & remove when no message is consuming or UNLOCK_DELAY_TIME_MILLS timeout (Backwards compatibility)
             boolean forceUnlock = pq.isDropped() && System.currentTimeMillis() > pq.getLastLockTimestamp() + UNLOCK_DELAY_TIME_MILLS;
+            // 获取到consumerLock后才能将pq解锁，然后才能释放mq的分布式锁
             if (forceUnlock || pq.getConsumeLock().writeLock().tryLock(500, TimeUnit.MILLISECONDS)) {
                 try {
                     RebalancePushImpl.this.defaultMQPushConsumerImpl.getOffsetStore().persist(mq);

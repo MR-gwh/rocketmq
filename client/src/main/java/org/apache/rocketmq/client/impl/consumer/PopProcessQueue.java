@@ -24,9 +24,12 @@ import org.apache.rocketmq.remoting.protocol.body.PopProcessQueueInfo;
  */
 public class PopProcessQueue {
 
+    // 最长拉取空闲时间
     private final static long PULL_MAX_IDLE_TIME = Long.parseLong(System.getProperty("rocketmq.client.pull.pullMaxIdleTime", "120000"));
 
+    // 上一次pop消息的时间
     private long lastPopTimestamp = System.currentTimeMillis();
+    // 计数器，统计还没有ack的消息的数量
     private AtomicInteger waitAckCounter = new AtomicInteger(0);
     private volatile boolean dropped = false;
 

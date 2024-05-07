@@ -70,12 +70,16 @@ public class PullAPIWrapper {
         this.unitMode = unitMode;
     }
 
+    // 在pull模式下，根据拉取结果来做相应处理
     public PullResult processPullResult(final MessageQueue mq, final PullResult pullResult,
         final SubscriptionData subscriptionData) {
         PullResultExt pullResultExt = (PullResultExt) pullResult;
 
+        // 更新msg queue的消息来源broker
         this.updatePullFromWhichNode(mq, pullResultExt.getSuggestWhichBrokerId());
+        //  如果拉取到了消息
         if (PullStatus.FOUND == pullResult.getPullStatus()) {
+            // 将消息由二进制数据解析为MessageExt
             ByteBuffer byteBuffer = ByteBuffer.wrap(pullResultExt.getMessageBinary());
             List<MessageExt> msgList = MessageDecoder.decodesBatch(
                 byteBuffer,

@@ -24,6 +24,7 @@ import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+
 import org.apache.commons.lang3.StringUtils;
 import org.apache.rocketmq.client.consumer.DefaultMQPushConsumer;
 import org.apache.rocketmq.common.message.MessageAccessor;
@@ -38,18 +39,22 @@ import org.apache.rocketmq.remoting.protocol.body.ProcessQueueInfo;
  */
 public class ProcessQueue {
     public final static long REBALANCE_LOCK_MAX_LIVE_TIME =
-        Long.parseLong(System.getProperty("rocketmq.client.rebalance.lockMaxLiveTime", "30000"));
+            Long.parseLong(System.getProperty("rocketmq.client.rebalance.lockMaxLiveTime", "30000"));
     public final static long REBALANCE_LOCK_INTERVAL = Long.parseLong(System.getProperty("rocketmq.client.rebalance.lockInterval", "20000"));
     private final static long PULL_MAX_IDLE_TIME = Long.parseLong(System.getProperty("rocketmq.client.pull.pullMaxIdleTime", "120000"));
     private final Logger log = LoggerFactory.getLogger(ProcessQueue.class);
     private final ReadWriteLock treeMapLock = new ReentrantReadWriteLock();
+    // key是消息的offset值，value是消息对象，因此消息是offset有序存储的
     private final TreeMap<Long, MessageExt> msgTreeMap = new TreeMap<>();
+    // 消息数量和大小
     private final AtomicLong msgCount = new AtomicLong();
     private final AtomicLong msgSize = new AtomicLong();
+    // 防止正在消费消息时进行rebalance，分配给了其他consumer导致重复消费
     private final ReadWriteLock consumeLock = new ReentrantReadWriteLock();
     /**
      * A subset of msgTreeMap, will only be used when orderly consume
      */
+    // 该容器里的存储的消息都是 正在 消费的消息
     private final TreeMap<Long, MessageExt> consumingMsgOrderlyTreeMap = new TreeMap<>();
     private final AtomicLong tryUnlockTimes = new AtomicLong(0);
     private volatile long queueOffsetMax = 0L;
@@ -167,6 +172,7 @@ public class ProcessQueue {
         return dispatchToConsume;
     }
 
+    // 获取最大和最小offset的差值，需要对msgTreeMap加读锁，防止并发问题导致的计数不准
     public long getMaxSpan() {
         try {
             this.treeMapLock.readLock().lockInterruptibly();
@@ -247,6 +253,7 @@ public class ProcessQueue {
         this.locked = locked;
     }
 
+    // 将consumingMsgOrderlyTreeMap里的消息重新放回到treeMapLock里，等待下一次的消费
     public void rollback() {
         try {
             this.treeMapLock.writeLock().lockInterruptibly();
@@ -261,6 +268,8 @@ public class ProcessQueue {
         }
     }
 
+    // 执行快照提交，返回下一个消费的预期offset。特别要注意自动提交时的consumingMsgOrderlyTreeMap清理问题，可能会导致内存泄漏
+    // 执行的操作主要有：1、更新快照的msgCount和msgSize（减去所有已消费消息数量及其size）；2、清除consumingMsgOrderlyTreeMap
     public long commit() {
         try {
             this.treeMapLock.writeLock().lockInterruptibly();
@@ -287,6 +296,7 @@ public class ProcessQueue {
         return -1;
     }
 
+    // 重消费执行消息 实现非常简单，将这些msg从consumingMsgOrderlyTreeMap里移除，然后再次放入到msgTreeMap
     public void makeMessageToConsumeAgain(List<MessageExt> msgs) {
         try {
             this.treeMapLock.writeLock().lockInterruptibly();
@@ -303,6 +313,7 @@ public class ProcessQueue {
         }
     }
 
+    // 从快照里取一批消息，按序从msgTreeMap里poll消息放到consumingMsgOrderlyTreeMap里
     public List<MessageExt> takeMessages(final int batchSize) {
         List<MessageExt> result = new ArrayList<>(batchSize);
         final long now = System.currentTimeMillis();
@@ -338,6 +349,7 @@ public class ProcessQueue {
     /**
      * Return the result that whether current message is exist in the process queue or not.
      */
+    // 判断一个消费是否在快照里存在（正在被消费的消息会被认为不存在）
     public boolean containsMessage(MessageExt message) {
         if (message == null) {
             // should never reach here.

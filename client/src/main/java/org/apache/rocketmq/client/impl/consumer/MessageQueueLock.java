@@ -24,6 +24,7 @@ import org.apache.rocketmq.common.message.MessageQueue;
  * Message lock,strictly ensure the single queue only one thread at a time consuming
  */
 public class MessageQueueLock {
+    // 初版的value是一个Object，一个队列对应了一个锁对象。当前的是一个map，主要是适配pop模式，一个queue可以被多个consumer消费的场景
     private ConcurrentMap<MessageQueue, ConcurrentMap<Integer, Object>> mqLockTable =
         new ConcurrentHashMap<>(32);
 

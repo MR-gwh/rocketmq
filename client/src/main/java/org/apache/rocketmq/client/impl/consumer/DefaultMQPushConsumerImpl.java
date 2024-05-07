@@ -1041,7 +1041,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
     private void checkConfig() throws MQClientException {
         Validators.checkGroup(this.defaultMQPushConsumer.getConsumerGroup());
 
-        // 不可能走到，不必要的代码
+        // todo 不可能走到的代码块，考虑删除
         if (null == this.defaultMQPushConsumer.getConsumerGroup()) {
             throw new MQClientException(
                 "consumerGroup is null"
@@ -1280,6 +1280,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
         }
     }
 
+    // todo 既然已经有封装好的方法了，是否要对所有的this.rebalanceImpl.getSubscriptionInner()方法进行替换
     public ConcurrentMap<String, SubscriptionData> getSubscriptionInner() {
         return this.rebalanceImpl.getSubscriptionInner();
     }

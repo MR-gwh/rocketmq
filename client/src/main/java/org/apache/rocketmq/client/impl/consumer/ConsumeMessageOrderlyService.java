@@ -429,6 +429,7 @@ public class ConsumeMessageOrderlyService implements ConsumeMessageService {
                 return;
             }
 
+            // 获取队列lock对象并加锁
             final Object objLock = messageQueueLock.fetchLockObject(this.messageQueue);
             synchronized (objLock) {
                 if (MessageModel.BROADCASTING.equals(ConsumeMessageOrderlyService.this.defaultMQPushConsumerImpl.messageModel())
@@ -463,6 +464,7 @@ public class ConsumeMessageOrderlyService implements ConsumeMessageService {
                         final int consumeBatchSize =
                             ConsumeMessageOrderlyService.this.defaultMQPushConsumer.getConsumeMessageBatchMaxSize();
 
+                        // 从快照里取consumeBatchSize条消息
                         List<MessageExt> msgs = this.processQueue.takeMessages(consumeBatchSize);
                         defaultMQPushConsumerImpl.resetRetryAndNamespace(msgs, defaultMQPushConsumer.getConsumerGroup());
                         if (!msgs.isEmpty()) {
