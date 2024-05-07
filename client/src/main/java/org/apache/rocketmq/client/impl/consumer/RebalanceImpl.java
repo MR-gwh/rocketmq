@@ -46,6 +46,7 @@ import org.apache.rocketmq.remoting.protocol.heartbeat.SubscriptionData;
 import org.apache.rocketmq.logging.org.slf4j.Logger;
 import org.apache.rocketmq.logging.org.slf4j.LoggerFactory;
 
+// rocketmq的消费组rebalance操作是交给consumer实现的 具体实现逻辑在rebalanceImpl里完成
 public abstract class RebalanceImpl {
     protected static final Logger log = LoggerFactory.getLogger(RebalanceImpl.class);
 
@@ -75,6 +76,7 @@ public abstract class RebalanceImpl {
         this.mQClientFactory = mQClientFactory;
     }
 
+    // 释放broker中的mq分布式锁
     public void unlock(final MessageQueue mq, final boolean oneway) {
         FindBrokerResult findBrokerResult = this.mQClientFactory.findBrokerAddressInSubscribe(this.mQClientFactory.getBrokerNameFromMessageQueue(mq), MixAll.MASTER_ID, true);
         if (findBrokerResult != null) {
@@ -95,9 +97,12 @@ public abstract class RebalanceImpl {
         }
     }
 
+    // 释放processQueueTable中包含的所有mq（也就是当前消费者消费的所有mq）的分布式锁
     public void unlockAll(final boolean oneway) {
+        // 将mq按broker分组
         HashMap<String, Set<MessageQueue>> brokerMqs = this.buildProcessQueueTableByBrokerName();
 
+        // 按broker批量释放mq锁
         for (final Map.Entry<String, Set<MessageQueue>> entry : brokerMqs.entrySet()) {
             final String brokerName = entry.getKey();
             final Set<MessageQueue> mqs = entry.getValue();
@@ -116,6 +121,7 @@ public abstract class RebalanceImpl {
                 try {
                     this.mQClientFactory.getMQClientAPIImpl().unlockBatchMQ(findBrokerResult.getBrokerAddr(), requestBody, 1000, oneway);
 
+                    // 更新消费快照锁定状态
                     for (MessageQueue mq : mqs) {
                         ProcessQueue processQueue = this.processQueueTable.get(mq);
                         if (processQueue != null) {
@@ -133,6 +139,7 @@ public abstract class RebalanceImpl {
     private HashMap<String/* brokerName */, Set<MessageQueue>> buildProcessQueueTableByBrokerName() {
         HashMap<String, Set<MessageQueue>> result = new HashMap<>();
 
+        // 遍历快照表，将快照按broker分组
         for (Map.Entry<MessageQueue, ProcessQueue> entry : this.processQueueTable.entrySet()) {
             MessageQueue mq = entry.getKey();
             ProcessQueue pq = entry.getValue();
@@ -154,6 +161,7 @@ public abstract class RebalanceImpl {
         return result;
     }
 
+    // 对mq加分布式锁
     public boolean lock(final MessageQueue mq) {
         FindBrokerResult findBrokerResult = this.mQClientFactory.findBrokerAddressInSubscribe(this.mQClientFactory.getBrokerNameFromMessageQueue(mq), MixAll.MASTER_ID, true);
         if (findBrokerResult != null) {
@@ -184,6 +192,7 @@ public abstract class RebalanceImpl {
         return false;
     }
 
+    // 对所有消费快照对应的队列加分布式锁
     public void lockAll() {
         HashMap<String, Set<MessageQueue>> brokerMqs = this.buildProcessQueueTableByBrokerName();
 
@@ -238,6 +247,7 @@ public abstract class RebalanceImpl {
         boolean balanced = true;
         Map<String, SubscriptionData> subTable = this.getSubscriptionInner();
         if (subTable != null) {
+            // 按主题维度进行
             for (final Map.Entry<String, SubscriptionData> entry : subTable.entrySet()) {
                 final String topic = entry.getKey();
                 try {
@@ -261,6 +271,7 @@ public abstract class RebalanceImpl {
             }
         }
 
+        // 清除非订阅的主题的mq
         this.truncateMessageQueueNotMyTopic();
 
         return balanced;

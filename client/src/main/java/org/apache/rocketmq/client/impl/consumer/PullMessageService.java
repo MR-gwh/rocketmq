@@ -28,6 +28,9 @@ import org.apache.rocketmq.common.utils.ThreadUtils;
 import org.apache.rocketmq.logging.org.slf4j.Logger;
 import org.apache.rocketmq.logging.org.slf4j.LoggerFactory;
 
+// 这个线程会不断从缓冲队列中获取request，然后执行对应的拉取逻辑（consumerImpl.pullMessage），提供了一个schedule单线程池来延迟request放入缓冲队列
+// service -> consumerImpl.pullMessage -> 正常情况下调用pullAPIWrapper拉取消息，在found消息时执行注册的pullback
+//                                    `-> 限流或exception情况下，由this.scheduledExecutorService延迟放入messageRequestQueue等待下一次执行
 public class PullMessageService extends ServiceThread {
     private final Logger logger = LoggerFactory.getLogger(PullMessageService.class);
     private final LinkedBlockingQueue<MessageRequest> messageRequestQueue = new LinkedBlockingQueue<>();
@@ -102,6 +105,7 @@ public class PullMessageService extends ServiceThread {
         return scheduledExecutorService;
     }
 
+    // 选取一个consumerImpl尝试pull消息
     private void pullMessage(final PullRequest pullRequest) {
         final MQConsumerInner consumer = this.mQClientFactory.selectConsumer(pullRequest.getConsumerGroup());
         if (consumer != null) {
@@ -112,6 +116,7 @@ public class PullMessageService extends ServiceThread {
         }
     }
 
+    // 选取一个consumerImpl尝试pop消息
     private void popMessage(final PopRequest popRequest) {
         final MQConsumerInner consumer = this.mQClientFactory.selectConsumer(popRequest.getConsumerGroup());
         if (consumer != null) {
@@ -122,6 +127,7 @@ public class PullMessageService extends ServiceThread {
         }
     }
 
+    // 不断地从messageRequestQueue里拿request处理
     @Override
     public void run() {
         logger.info(this.getServiceName() + " service started");

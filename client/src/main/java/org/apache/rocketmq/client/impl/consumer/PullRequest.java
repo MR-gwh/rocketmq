@@ -19,9 +19,13 @@ package org.apache.rocketmq.client.impl.consumer;
 import org.apache.rocketmq.common.message.MessageQueue;
 import org.apache.rocketmq.common.message.MessageRequestMode;
 
+// 拉取请求对象，封装了拉取消息时需要的各类信息
 public class PullRequest implements MessageRequest {
+    // 拉取的消息由哪个消费者消费
     private String consumerGroup;
+    // 消息队列
     private MessageQueue messageQueue;
+    // 消费快照
     private ProcessQueue processQueue;
     private long nextOffset;
     private boolean previouslyLocked = false;
