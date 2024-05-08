@@ -506,6 +506,7 @@ public class ConsumeMessageOrderlyService implements ConsumeMessageService {
                                     messageQueue, e);
                                 hasException = true;
                             } finally {
+                                // todo 解锁操作放在位移提交后是不是更好？
                                 this.processQueue.getConsumeLock().readLock().unlock();
                             }
 

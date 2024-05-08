@@ -96,6 +96,7 @@ public class RebalancePushImpl extends RebalanceImpl {
             && MessageModel.CLUSTERING.equals(this.defaultMQPushConsumerImpl.messageModel())) {
 
             // commit offset immediately
+            // todo 为什么要提交一次呢？加锁后不是会提交吗
             this.defaultMQPushConsumerImpl.getOffsetStore().persist(mq);
 
             // remove order message queue: unlock & remove
@@ -114,6 +115,7 @@ public class RebalancePushImpl extends RebalanceImpl {
             // 获取到consumerLock后才能将pq解锁，然后才能释放mq的分布式锁
             if (forceUnlock || pq.getConsumeLock().writeLock().tryLock(500, TimeUnit.MILLISECONDS)) {
                 try {
+                    // 再持久化一次位移，防止这样一种情况导致的重复消费：persist -> pq.takeMessage -> pq.readLock -> tryRemove -> consume
                     RebalancePushImpl.this.defaultMQPushConsumerImpl.getOffsetStore().persist(mq);
                     RebalancePushImpl.this.defaultMQPushConsumerImpl.getOffsetStore().removeOffset(mq);
 
