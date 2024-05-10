@@ -27,6 +27,7 @@ public class DoNothingClientRemotingProcessor extends ClientRemotingProcessor {
         super(mqClientFactory);
     }
 
+    // 不处理remotingCommand
     @Override
     public RemotingCommand processRequest(ChannelHandlerContext ctx, RemotingCommand request) {
         return null;

@@ -730,9 +730,11 @@ public class MessageDecoder {
     }
 
     public static byte[] encodeMessages(List<Message> messages) {
-        //TO DO refactor, accumulate in one buffer, avoid copies
+        //TODO refactor, accumulate in one buffer, avoid copies
+        // 考虑借鉴netty的组合方式
         List<byte[]> encodedMessages = new ArrayList<>(messages.size());
         int allSize = 0;
+        // 将所有的消息转换为二进制流
         for (Message message : messages) {
             byte[] tmp = encodeMessage(message);
             encodedMessages.add(tmp);
@@ -740,6 +742,7 @@ public class MessageDecoder {
         }
         byte[] allBytes = new byte[allSize];
         int pos = 0;
+        // 将所有的byte数据拷贝到一个字节数组里
         for (byte[] bytes : encodedMessages) {
             System.arraycopy(bytes, 0, allBytes, pos, bytes.length);
             pos += bytes.length;

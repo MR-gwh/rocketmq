@@ -82,6 +82,7 @@ import org.apache.rocketmq.remoting.protocol.header.UnlockBatchMqRequestHeader;
 import org.apache.rocketmq.remoting.protocol.header.UpdateConsumerOffsetRequestHeader;
 import org.apache.rocketmq.remoting.protocol.heartbeat.HeartbeatData;
 
+// 对MQClientAPIImpl的增强，提供了很多异步的，响应式的API
 public class MQClientAPIExt extends MQClientAPIImpl {
     private static final Logger log = LoggerFactory.getLogger(LoggerName.PROXY_LOGGER_NAME);
 
@@ -109,6 +110,7 @@ public class MQClientAPIExt extends MQClientAPIImpl {
         return false;
     }
 
+    // 发起一次心跳，是对invokeOneway的封装
     public CompletableFuture<Void> sendHeartbeatOneway(
         String brokerAddr,
         HeartbeatData heartbeatData,
@@ -127,6 +129,7 @@ public class MQClientAPIExt extends MQClientAPIImpl {
         return future;
     }
 
+    // 响应式发送心跳
     public CompletableFuture<Integer> sendHeartbeatAsync(
         String brokerAddr,
         HeartbeatData heartbeatData,
@@ -147,6 +150,7 @@ public class MQClientAPIExt extends MQClientAPIImpl {
         });
     }
 
+    // 响应式发送一条消息
     public CompletableFuture<SendResult> sendMessageAsync(
         String brokerAddr,
         String brokerName,
@@ -169,6 +173,7 @@ public class MQClientAPIExt extends MQClientAPIImpl {
         });
     }
 
+    // 响应式批量发送消息
     public CompletableFuture<SendResult> sendMessageAsync(
         String brokerAddr,
         String brokerName,
@@ -188,6 +193,7 @@ public class MQClientAPIExt extends MQClientAPIImpl {
             msgBatch.setBody(body);
 
             request.setBody(body);
+            // 返回一个CompletableFuture，它会在同步发送消息后响应式处理发送结果
             return this.getRemotingClient().invoke(brokerAddr, request, timeoutMillis).thenCompose(response -> {
                 CompletableFuture<SendResult> future0 = new CompletableFuture<>();
                 try {
@@ -203,6 +209,7 @@ public class MQClientAPIExt extends MQClientAPIImpl {
         return future;
     }
 
+    // 消费者回传消息，在重试多次后还是消费失败时，会将消息转发给死信队列。当然不会将整个消息又发回给broker，只要告诉broker消息的信息就好
     public CompletableFuture<RemotingCommand> sendMessageBackAsync(
         String brokerAddr,
         ConsumerSendMsgBackRequestHeader requestHeader,
@@ -212,6 +219,7 @@ public class MQClientAPIExt extends MQClientAPIImpl {
         return this.getRemotingClient().invoke(brokerAddr, request, timeoutMillis);
     }
 
+    // 响应式pop一批消息
     public CompletableFuture<PopResult> popMessageAsync(
         String brokerAddr,
         String brokerName,
@@ -237,6 +245,7 @@ public class MQClientAPIExt extends MQClientAPIImpl {
         return future;
     }
 
+    // 响应式ack消息
     public CompletableFuture<AckResult> ackMessageAsync(
         String brokerAddr,
         AckMessageRequestHeader requestHeader,

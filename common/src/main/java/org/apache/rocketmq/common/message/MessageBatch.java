@@ -39,18 +39,22 @@ public class MessageBatch extends Message implements Iterable<Message> {
         return messages.iterator();
     }
 
+    // 校验批量发送的消息是否符合要求，符合的话就组成一个MessageBatch对象
     public static MessageBatch generateFromList(Collection<? extends Message> messages) {
         assert messages != null;
         assert messages.size() > 0;
         List<Message> messageList = new ArrayList<>(messages.size());
         Message first = null;
         for (Message message : messages) {
+            // 1. 不支持延时消息
             if (message.getDelayTimeLevel() > 0) {
                 throw new UnsupportedOperationException("TimeDelayLevel is not supported for batching");
             }
+            // 2. 不支持重试消息
             if (message.getTopic().startsWith(MixAll.RETRY_GROUP_TOPIC_PREFIX)) {
                 throw new UnsupportedOperationException("Retry Group is not supported for batching");
             }
+            // 不支持非同主题，非同PROPERTY_WAIT_STORE_MSG_OK参数值的消息批量发送
             if (first == null) {
                 first = message;
             } else {

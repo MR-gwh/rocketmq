@@ -279,6 +279,7 @@ public abstract class RebalanceImpl {
         return balanced;
     }
 
+    // 查询重分配是否由broker端进行
     private boolean tryQueryAssignment(String topic) {
         if (topicClientRebalance.containsKey(topic)) {
             return false;
@@ -355,7 +356,7 @@ public abstract class RebalanceImpl {
                     List<MessageQueue> mqAll = new ArrayList<>();
                     mqAll.addAll(mqSet);
 
-                    // 将topic的队列和消费组consumer进行排序，减少不同consumer进行重平衡的不一致问题
+                    // 将topic的队列和消费组consumer进行排序，不然会导致多个consumer自行生成的方案不一致的问题
                     Collections.sort(mqAll);
                     Collections.sort(cidAll);
 
@@ -363,6 +364,7 @@ public abstract class RebalanceImpl {
 
                     List<MessageQueue> allocateResult = null;
                     try {
+                        // 根据设定的分配策略来给consumer分配队列
                         allocateResult = strategy.allocate(
                             this.consumerGroup,
                             this.mQClientFactory.getClientId(),
@@ -378,7 +380,7 @@ public abstract class RebalanceImpl {
                         allocateResultSet.addAll(allocateResult);
                     }
 
-                    // 更新processQueueTable
+                    // 根据分配队列结果更新processQueueTable
                     boolean changed = this.updateProcessQueueTableInRebalance(topic, allocateResultSet, isOrder);
                     if (changed) {
                         log.info(
@@ -388,6 +390,7 @@ public abstract class RebalanceImpl {
                         this.messageQueueChanged(topic, mqSet, allocateResultSet);
                     }
 
+                    // 检查本地维护的消费队列是否符合预期
                     balanced = allocateResultSet.equals(getWorkingMessageQueue(topic));
                 }
                 break;
@@ -399,6 +402,7 @@ public abstract class RebalanceImpl {
         return balanced;
     }
 
+    // 从broker获取到队列分配结果，并进行重平衡操作。方法返回重平衡结果
     private boolean getRebalanceResultFromBroker(final String topic, final boolean isOrder) {
         String strategyName = this.allocateMessageQueueStrategy.getName();
         Set<MessageQueueAssignment> messageQueueAssignments;
@@ -421,13 +425,16 @@ public abstract class RebalanceImpl {
             }
         }
         Set<MessageQueue> mqAll = null;
+        // 更新本地processQueueTable
         boolean changed = this.updateMessageQueueAssignment(topic, messageQueueAssignments, isOrder);
         if (changed) {
             log.info("broker rebalanced result changed. allocateMessageQueueStrategyName={}, group={}, topic={}, clientId={}, assignmentSet={}",
                 strategyName, consumerGroup, topic, this.mQClientFactory.getClientId(), messageQueueAssignments);
+            // 触发mq变更监听器
             this.messageQueueChanged(topic, mqAll, mqSet);
         }
 
+        // 对比期望的mq集合和本地processQueueTable维护的是否一致，一致就说明重平衡
         return mqSet.equals(getWorkingMessageQueue(topic));
     }
 
@@ -596,6 +603,7 @@ public abstract class RebalanceImpl {
             }
         }
 
+        // 非重试主题才要进行消费分配
         if (!topic.startsWith(MixAll.RETRY_GROUP_TOPIC_PREFIX)) {
             if (mq2PopAssignment.isEmpty() && !mq2PushAssignment.isEmpty()) {
                 //pop switch to push
