@@ -391,7 +391,7 @@ public class MQClientInstance {
             }
         }, 1000 * 10, this.clientConfig.getPersistConsumerOffsetInterval(), TimeUnit.MILLISECONDS);
 
-        // 每
+        // 每隔一分钟调整一次线程池大小（实际上没有任何时实际的调整操作）
         this.scheduledExecutorService.scheduleAtFixedRate(() -> {
             try {
                 MQClientInstance.this.adjustThreadPool();
@@ -405,6 +405,7 @@ public class MQClientInstance {
         return clientId;
     }
 
+    // 从namesrv更新主题路由信息（包括producer和consumer订阅的主题）
     public void updateTopicRouteInfoFromNameServer() {
         Set<String> topicList = new HashSet<>();
 
@@ -455,7 +456,7 @@ public class MQClientInstance {
     }
 
     /**
-     * Remove offline broker
+     * Remove offline broker（在brokerAddrTable里，但在topicRouteTable里找不到对应地址的broker被认为是下线了）
      */
     private void cleanOfflineBroker() {
         try {
@@ -501,6 +502,8 @@ public class MQClientInstance {
         }
     }
 
+    // 检查broker是否支持SQL92的订阅表达式
+    // todo 为什么使用了抛异常来标识不支持，而不是直接返回结果
     public void checkClientInBroker() throws MQClientException {
 
         for (Entry<String, MQConsumerInner> entry : this.consumerTable.entrySet()) {
@@ -790,6 +793,7 @@ public class MQClientInstance {
         return true;
     }
 
+    // isDefault为true时，更新模版主题的TBW102主题的路由信息
     public boolean updateTopicRouteInfoFromNameServer(final String topic, boolean isDefault,
         DefaultMQProducer defaultMQProducer) {
         try {
@@ -808,6 +812,9 @@ public class MQClientInstance {
                     } else {
                         topicRouteData = this.mQClientAPIImpl.getTopicRouteInfoFromNameServer(topic, clientConfig.getMqClientApiTimeout());
                     }
+                    // 从namesrv获取到的，主题的路由信息不为空时：
+                    // 1. 本地和namesrv的路由信息不相同时，更新
+                    // 2. 即使相同的情况下，只要绑定了当前instance的消费者或者生产者本地的缓存里没有指定topic的mq信息时（consumer要订阅了topic），更新
                     if (topicRouteData != null) {
                         TopicRouteData old = this.topicRouteTable.get(topic);
                         boolean changed = topicRouteData.topicRouteDataChanged(old);
@@ -932,6 +939,7 @@ public class MQClientInstance {
         return false;
     }
 
+    // 判断是否需要更新topic路由信息：1.producer维护的producerTable里没有相关topic-mq关系；2.consumer订阅了topic，但是没有topic的订阅信息
     private boolean isNeedUpdateTopicRouteInfo(final String topic) {
         boolean result = false;
         Iterator<Entry<String, MQProducerInner>> producerIterator = this.producerTable.entrySet().iterator();
@@ -1150,6 +1158,7 @@ public class MQClientInstance {
         return null;
     }
 
+    // 获取master broker的地址
     public String findBrokerAddressInPublish(final String brokerName) {
         if (brokerName == null) {
             return null;
@@ -1162,6 +1171,7 @@ public class MQClientInstance {
         return null;
     }
 
+    // 根据brokerId获取broker地址，如果brokerId不是masterId，当找不到指定brokerId的地址时，会将brokerId+1（目的是兼容DLedger模式）
     public FindBrokerResult findBrokerAddressInSubscribe(
         final String brokerName,
         final long brokerId,
@@ -1185,11 +1195,12 @@ public class MQClientInstance {
                 found = brokerAddr != null;
             }
 
+            // 允许查询其他broker时，获取brokerAddrTable的第一个entry value（todo 是否有可能value是null？如果时null就不该标志为found）
             if (!found && !onlyThisBroker) {
                 Entry<Long, String> entry = map.entrySet().iterator().next();
                 brokerAddr = entry.getValue();
                 slave = entry.getKey() != MixAll.MASTER_ID;
-                found = true;
+                found = brokerAddr != null;
             }
         }
 
@@ -1206,7 +1217,7 @@ public class MQClientInstance {
                 return this.brokerVersionTable.get(brokerName).get(brokerAddr);
             }
         }
-        //To do need to fresh the version
+        //todo need to fresh the version
         return 0;
     }
 

@@ -124,7 +124,9 @@ public class DefaultMQProducerImpl implements MQProducerInner {
     private final Compressor compressor = CompressorFactory.getCompressor(compressType);
 
     // backpressure related
+    // 生产者并发数
     private Semaphore semaphoreAsyncSendNum;
+    // 生产者“处理中的消息最大数量
     private Semaphore semaphoreAsyncSendSize;
 
     public DefaultMQProducerImpl(final DefaultMQProducer defaultMQProducer) {
@@ -175,6 +177,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
             }
         };
 
+        // 设定故障处理策略
         this.mqFaultStrategy = new MQFaultStrategy(defaultMQProducer.cloneClientConfig(), new Resolver() {
             @Override
             public String resolve(String name) {
@@ -262,6 +265,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                     mQClientFactory.start();
                 }
 
+                // 初始化主题路由信息，如broker和分布在其上的队列映射关系。先查询namesrv里有没有指定的目标主题，没有的话
                 this.initTopicRoute();
 
                 this.mqFaultStrategy.startDetector();
@@ -592,6 +596,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
 
         @Override
         public void onException(Throwable e) {
+            // 尝试释放占用的信号量
             if (isSemaphoreAsyncSizeAquired) {
                 semaphoreAsyncSendSize.release(msgLen);
             }
@@ -612,6 +617,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
         int msgLen = msg.getBody() == null ? 1 : msg.getBody().length;
 
         try {
+            // 开启了背压模式时，尝试获取信号量，获取失败则执行callback的异常处理方法
             if (isEnableBackpressureForAsyncMode) {
                 long costTime = System.currentTimeMillis() - beginStartTime;
                 isSemaphoreAsyncNumAquired = timeout - costTime > 0
@@ -643,6 +649,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
         }
     }
 
+    // 执行设定的messageQueueSelector，用以计算出消息发送的目标队列
     public MessageQueue invokeMessageQueueSelector(Message msg, MessageQueueSelector selector, Object arg,
                                                    final long timeout) throws MQClientException, RemotingTooMuchRequestException {
         long beginStartTime = System.currentTimeMillis();

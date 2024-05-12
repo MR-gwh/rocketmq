@@ -134,6 +134,7 @@ public class MQFaultStrategy {
         this.latencyFaultTolerance.shutdown();
     }
 
+    //
     public MessageQueue selectOneMessageQueue(final TopicPublishInfo tpInfo, final String lastBrokerName, final boolean resetIndex) {
         BrokerFilter brokerFilter = threadBrokerFilter.get();
         brokerFilter.setLastBrokerName(lastBrokerName);

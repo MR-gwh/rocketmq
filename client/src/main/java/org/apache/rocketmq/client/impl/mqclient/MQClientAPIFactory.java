@@ -78,6 +78,7 @@ public class MQClientAPIFactory implements StartAndShutdown {
     public void start() throws Exception {
         this.clients = new MQClientAPIExt[this.clientNum];
 
+        // 启动client
         for (int i = 0; i < this.clientNum; i++) {
             clients[i] = createAndStart(this.namePrefix + "N_" + i);
         }

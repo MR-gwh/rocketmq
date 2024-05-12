@@ -22,6 +22,10 @@ import org.apache.rocketmq.common.UtilAll;
 
 public class TopicValidator {
 
+    // TBW102 topic的作用是在设置了isAutoCreateTopicEnable=true时，会作为模版来创建新的topic。
+    // 整个流程是：producer发送消息 -> 主题不存在，tryToFindTopicPublishInfo获取topic失败
+    // -> 再进行一次tryToFindTopicPublishInfo获取topic，这次直接拉取TBW102的路由信息
+    // -> 向TBW102正常发送消息 -> broker接收到消息后，根据TBW102来创建一个相同配置的topic，并放入producer发送的消息
     public static final String AUTO_CREATE_TOPIC_KEY_TOPIC = "TBW102"; // Will be created at broker when isAutoCreateTopicEnable
     public static final String RMQ_SYS_SCHEDULE_TOPIC = "SCHEDULE_TOPIC_XXXX";
     public static final String RMQ_SYS_BENCHMARK_TOPIC = "BenchmarkTest";
