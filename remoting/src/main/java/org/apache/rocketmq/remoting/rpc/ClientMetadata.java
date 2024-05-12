@@ -95,6 +95,7 @@ public class ClientMetadata {
         return brokerAddrTable;
     }
 
+    // 生成静态主题的端点（也就是逻辑MessageQueue）
     public static ConcurrentMap<MessageQueue, String> topicRouteData2EndpointsForStaticTopic(final String topic, final TopicRouteData route) {
         if (route.getTopicQueueMappingByBroker() == null
                 || route.getTopicQueueMappingByBroker().isEmpty()) {
@@ -103,6 +104,7 @@ public class ClientMetadata {
         ConcurrentMap<MessageQueue, String> mqEndPointsOfBroker = new ConcurrentHashMap<>();
 
         Map<String, Map<String, TopicQueueMappingInfo>> mappingInfosByScope = new HashMap<>();
+        // 按scope将 topicQueueMappingByBroker 分类
         for (Map.Entry<String, TopicQueueMappingInfo> entry : route.getTopicQueueMappingByBroker().entrySet()) {
             TopicQueueMappingInfo info = entry.getValue();
             String scope = info.getScope();
@@ -114,6 +116,7 @@ public class ClientMetadata {
             }
         }
 
+        // topicQueueMappingByBroker在scope组内生成mq - brokerName的map
         for (Map.Entry<String, Map<String, TopicQueueMappingInfo>> mapEntry : mappingInfosByScope.entrySet()) {
             String scope = mapEntry.getKey();
             Map<String, TopicQueueMappingInfo> topicQueueMappingInfoMap =  mapEntry.getValue();

@@ -114,6 +114,7 @@ public class PullAPIWrapper {
             }
 
             List<MessageExt> msgListFilterAgain = msgList;
+            // 当tag集合不为空，且没有使用class filter模式时，会将消息按tag做一次过滤
             if (!subscriptionData.getTagsSet().isEmpty() && !subscriptionData.isClassFilterMode()) {
                 msgListFilterAgain = new ArrayList<>(msgList.size());
                 for (MessageExt msg : msgList) {
@@ -125,6 +126,8 @@ public class PullAPIWrapper {
                 }
             }
 
+            // 设定了filterMessageFilter时，执行filterMessage方法进行消息过滤。
+            // 使用这种方式过滤消息会存在无意义的消息传输，导致broker和consumer额外的资源消耗，因此使用比较少
             if (this.hasHook()) {
                 FilterMessageContext filterMessageContext = new FilterMessageContext();
                 filterMessageContext.setUnitMode(unitMode);
@@ -181,6 +184,7 @@ public class PullAPIWrapper {
         }
     }
 
+    // 拉取消息的核心实现
     public PullResult pullKernelImpl(
         final MessageQueue mq,
         final String subExpression,
@@ -196,6 +200,7 @@ public class PullAPIWrapper {
         final CommunicationMode communicationMode,
         final PullCallback pullCallback
     ) throws MQClientException, RemotingException, MQBrokerException, InterruptedException {
+        // 获取mq所在的broker的信息，先尝试从本地缓存的brokerAddrTable里查，查不到就从nameserver里更新主题的路由信息，更新后再查一次
         FindBrokerResult findBrokerResult =
             this.mQClientFactory.findBrokerAddressInSubscribe(this.mQClientFactory.getBrokerNameFromMessageQueue(mq),
                 this.recalculatePullFromWhichNode(mq), false);
@@ -238,6 +243,7 @@ public class PullAPIWrapper {
             requestHeader.setBrokerName(mq.getBrokerName());
 
             String brokerAddr = findBrokerResult.getBrokerAddr();
+            // 开启了classFilter时，更新拉取消息的server地址（因为class filter是使用了一个单独的服务器来拉取并过滤消息，这样能降低consumer的压力）
             if (PullSysFlag.hasClassFilterFlag(sysFlagInner)) {
                 brokerAddr = computePullFromWhichFilterServer(mq.getTopic(), brokerAddr);
             }
@@ -285,11 +291,14 @@ public class PullAPIWrapper {
         );
     }
 
+    // 重新计算从哪个broker拉取消息
     public long recalculatePullFromWhichNode(final MessageQueue mq) {
+        // 开启了默认broker开关时，返回master broker
         if (this.isConnectBrokerByUser()) {
             return this.defaultBrokerId;
         }
 
+        // 从本地缓存里获取到了mq 对应的拉取broker，直接返回
         AtomicLong suggest = this.pullFromWhichNodeTable.get(mq);
         if (suggest != null) {
             return suggest.get();
@@ -298,6 +307,7 @@ public class PullAPIWrapper {
         return MixAll.MASTER_ID;
     }
 
+    // 弃用，用于判断从哪个filter server获取消息
     private String computePullFromWhichFilterServer(final String topic, final String brokerAddr)
         throws MQClientException {
         ConcurrentMap<String, TopicRouteData> topicRouteTable = this.mQClientFactory.getTopicRouteTable();

@@ -16,11 +16,17 @@
  */
 package org.apache.rocketmq.common.sysflag;
 
+// 拉取请求的系统标志位
 public class PullSysFlag {
+    // 表示从内存中读取的消费进度大于0，则设置该标记位（会触发一次broker端的commit？）
     private final static int FLAG_COMMIT_OFFSET = 0x1;
+    // 是否挂起
     private final static int FLAG_SUSPEND = 0x1 << 1;
+    // 消息过滤机制位为表达式机制
     private final static int FLAG_SUBSCRIPTION = 0x1 << 2;
+    // 消息过滤机制为类过滤模式
     private final static int FLAG_CLASS_FILTER = 0x1 << 3;
+    // 是否是lite pull模式
     private final static int FLAG_LITE_PULL_MESSAGE = 0x1 << 4;
 
     public static int buildSysFlag(final boolean commitOffset, final boolean suspend,

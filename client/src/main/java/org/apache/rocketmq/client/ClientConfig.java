@@ -262,6 +262,7 @@ public class ClientConfig {
         return cc;
     }
 
+    // 去掉namesrvAddr的http://前缀
     public String getNamesrvAddr() {
         if (StringUtils.isNotEmpty(namesrvAddr) && NameServerAddressUtils.NAMESRV_ENDPOINT_PATTERN.matcher(namesrvAddr.trim()).matches()) {
             return NameServerAddressUtils.getNameSrvAddrFromNamesrvEndpoint(namesrvAddr);

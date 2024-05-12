@@ -88,6 +88,9 @@ import org.apache.rocketmq.logging.org.slf4j.LoggerFactory;
 
 import static org.apache.rocketmq.remoting.rpc.ClientMetadata.topicRouteData2EndpointsForStaticTopic;
 
+// 客户端实例核心对象，负责调度和管理了多个分工明确的Service实现消息拉取、发送、重平衡等操作；使用MQClientAPIImpl和rocketmq通信
+// 不对外部开放使用，有MQClientManager创建、管理和分配给producer、consumer（只要满足一定规则，manager会认为instance可复用
+// 就会导致多producer或consumer使用同一instance的情况，产生预期外的行为）
 public class MQClientInstance {
     private final static long LOCK_TIMEOUT_MILLIS = 3000;
     private final static Logger log = LoggerFactory.getLogger(MQClientInstance.class);
@@ -110,8 +113,11 @@ public class MQClientInstance {
      */
     private final ConcurrentMap<String, MQAdminExtInner> adminExtTable = new ConcurrentHashMap<>();
     private final NettyClientConfig nettyClientConfig;
+    // 和broker、nameserver通信的API，封装了一个网络通信remotingClient
     private final MQClientAPIImpl mQClientAPIImpl;
+    // 用于对mq进行管理操作
     private final MQAdminImpl mQAdminImpl;
+    // 管理主题路由信息，包括主题有哪些队列，队列分布在那些broker/filterServer上
     private final ConcurrentMap<String/* Topic */, TopicRouteData> topicRouteTable = new ConcurrentHashMap<>();
     private final ConcurrentMap<String/* Topic */, ConcurrentMap<MessageQueue, String/*brokerName*/>> topicEndPointsTable = new ConcurrentHashMap<>();
     private final Lock lockNamesrv = new ReentrantLock();
@@ -126,16 +132,21 @@ public class MQClientInstance {
 
     private final ConcurrentMap<String/* Broker Name */, HashMap<String/* address */, Integer>> brokerVersionTable = new ConcurrentHashMap<>();
     private final Set<String/* Broker address */> brokerSupportV2HeartbeatSet = new HashSet();
+    // broker地址心跳指纹表
     private final ConcurrentMap<String, Integer> brokerAddrHeartbeatFingerprintTable = new ConcurrentHashMap();
     private final ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor(r -> new Thread(r, "MQClientFactoryScheduledThread"));
+    // 未使用，看上去是想开个拉取远程配置的线程
     private final ScheduledExecutorService fetchRemoteConfigExecutorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
         @Override
         public Thread newThread(Runnable r) {
             return new Thread(r, "MQClientFactoryFetchRemoteConfigScheduledThread");
         }
     });
+    // 拉取消息service，不断地执行pullRequest任务调度consumer拉取消息，并设定了回调方法，在拉取成功时，向consumerService提交消费任务consumeRequest
     private final PullMessageService pullMessageService;
+    // 重平衡service，定期做重平衡操作
     private final RebalanceService rebalanceService;
+
     private final DefaultMQProducer defaultMQProducer;
     private final ConsumerStatsManager consumerStatsManager;
     private final AtomicLong sendHeartbeatTimesTotal = new AtomicLong(0);
@@ -155,6 +166,8 @@ public class MQClientInstance {
         ClientRemotingProcessor clientRemotingProcessor = new ClientRemotingProcessor(this);
         ChannelEventListener channelEventListener;
         if (clientConfig.isEnableHeartbeatChannelEventListener()) {
+            // 为netty client定义一个listener，作用是在和broker建立连接时，如果发现连接的broker地址在本地已有维护，说明是重连的，立即触发一次重平衡操作
+            // 达到快速恢复的目的
             channelEventListener = new ChannelEventListener() {
                 private final ConcurrentMap<String, HashMap<Long, String>> brokerAddrTable = MQClientInstance.this.brokerAddrTable;
                 @Override
@@ -196,6 +209,7 @@ public class MQClientInstance {
         this.mQClientAPIImpl = new MQClientAPIImpl(this.nettyClientConfig, clientRemotingProcessor, rpcHook, clientConfig, channelEventListener);
 
         if (this.clientConfig.getNamesrvAddr() != null) {
+            // 更新mQClientAPIImpl namesrv地址列表，多个地址使用;分割
             this.mQClientAPIImpl.updateNameServerAddressList(this.clientConfig.getNamesrvAddr());
             log.info("user specified name server address: {}", this.clientConfig.getNamesrvAddr());
         }
@@ -220,6 +234,7 @@ public class MQClientInstance {
             MQVersion.getVersionDesc(MQVersion.CURRENT_VERSION), RemotingCommand.getSerializeTypeConfigInThisServer());
     }
 
+    // 利用topicRouteData决策TopicPublishInfo的属性值
     public static TopicPublishInfo topicRouteData2TopicPublishInfo(final String topic, final TopicRouteData route) {
         TopicPublishInfo info = new TopicPublishInfo();
         // TO DO should check the usage of raw route, it is better to remove such field
@@ -277,13 +292,16 @@ public class MQClientInstance {
         return info;
     }
 
+    // 使用TopicRouteData创建每个队列对应的逻辑MessageQueue对象
     public static Set<MessageQueue> topicRouteData2TopicSubscribeInfo(final String topic, final TopicRouteData route) {
         Set<MessageQueue> mqList = new HashSet<>();
         if (route.getTopicQueueMappingByBroker() != null
             && !route.getTopicQueueMappingByBroker().isEmpty()) {
+            // 生成逻辑队列和brokerName的映射关系
             ConcurrentMap<MessageQueue, String> mqEndPoints = topicRouteData2EndpointsForStaticTopic(topic, route);
             return mqEndPoints.keySet();
         }
+        // 没有TopicQueueMappingByBroker数据，就使用QueueData生成
         List<QueueData> qds = route.getQueueDatas();
         for (QueueData qd : qds) {
             if (PermName.isReadable(qd.getPerm())) {
@@ -297,8 +315,10 @@ public class MQClientInstance {
         return mqList;
     }
 
+    // 核心启动方法，
     public void start() throws MQClientException {
 
+        // 加锁防止重复start
         synchronized (this) {
             switch (this.serviceState) {
                 case CREATE_JUST:
@@ -328,6 +348,10 @@ public class MQClientInstance {
         }
     }
 
+    // 启动了大量的定时任务
+    // 1. 当没有配置namesrv时，每隔2分钟拉取一次namesrv。拉取的地址默认是
+    // "http://" + wsDomainName + "/rocketmq/" + wsDomainSubgroup + 一些可调链接参数
+    // （可配置wsDomainName和wsDomainSubgroup）
     private void startScheduledTask() {
         if (null == this.clientConfig.getNamesrvAddr()) {
             this.scheduledExecutorService.scheduleAtFixedRate(() -> {
@@ -339,6 +363,7 @@ public class MQClientInstance {
             }, 1000 * 10, 1000 * 60 * 2, TimeUnit.MILLISECONDS);
         }
 
+        // 每隔30s从namesrv更新topic路由信息
         this.scheduledExecutorService.scheduleAtFixedRate(() -> {
             try {
                 MQClientInstance.this.updateTopicRouteInfoFromNameServer();
@@ -347,6 +372,7 @@ public class MQClientInstance {
             }
         }, 10, this.clientConfig.getPollNameServerInterval(), TimeUnit.MILLISECONDS);
 
+        // 每隔30s向所有broker发送心跳
         this.scheduledExecutorService.scheduleAtFixedRate(() -> {
             try {
                 MQClientInstance.this.cleanOfflineBroker();
@@ -356,6 +382,7 @@ public class MQClientInstance {
             }
         }, 1000, this.clientConfig.getHeartbeatBrokerInterval(), TimeUnit.MILLISECONDS);
 
+        // 每隔5s持久化消费者位移
         this.scheduledExecutorService.scheduleAtFixedRate(() -> {
             try {
                 MQClientInstance.this.persistAllConsumerOffset();
@@ -364,6 +391,7 @@ public class MQClientInstance {
             }
         }, 1000 * 10, this.clientConfig.getPersistConsumerOffsetInterval(), TimeUnit.MILLISECONDS);
 
+        // 每
         this.scheduledExecutorService.scheduleAtFixedRate(() -> {
             try {
                 MQClientInstance.this.adjustThreadPool();
