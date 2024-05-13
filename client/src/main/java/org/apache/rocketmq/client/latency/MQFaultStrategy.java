@@ -134,7 +134,7 @@ public class MQFaultStrategy {
         this.latencyFaultTolerance.shutdown();
     }
 
-    //
+    // 从topic里选择一个mq，轮询方式，每次访问都会取列表里的下一个queue，通过filter过滤的话就返回
     public MessageQueue selectOneMessageQueue(final TopicPublishInfo tpInfo, final String lastBrokerName, final boolean resetIndex) {
         BrokerFilter brokerFilter = threadBrokerFilter.get();
         brokerFilter.setLastBrokerName(lastBrokerName);

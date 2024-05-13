@@ -690,6 +690,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
         return this.mqFaultStrategy.selectOneMessageQueue(tpInfo, lastBrokerName, resetIndex);
     }
 
+    // 更新延时发送时间
     public void updateFaultItem(final String brokerName, final long currentLatency, boolean isolation,
                                 boolean reachable) {
         this.mqFaultStrategy.updateFaultItem(brokerName, currentLatency, isolation, reachable);
@@ -722,6 +723,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
             MessageQueue mq = null;
             Exception exception = null;
             SendResult sendResult = null;
+            // 同步发送时，最大总发送次数为设定的重试次数+1
             int timesTotal = communicationMode == CommunicationMode.SYNC ? 1 + this.defaultMQProducer.getRetryTimesWhenSendFailed() : 1;
             int times = 0;
             String[] brokersSent = new String[timesTotal];
@@ -731,6 +733,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                 if (times > 0) {
                     resetIndex = true;
                 }
+                // 使用轮询+filter的策略获取一个queue
                 MessageQueue mqSelected = this.selectOneMessageQueue(topicPublishInfo, lastBrokerName, resetIndex);
                 if (mqSelected != null) {
                     mq = mqSelected;
@@ -741,6 +744,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                             //Reset topic with namespace during resend.
                             msg.setTopic(this.defaultMQProducer.withNamespace(msg.getTopic()));
                         }
+                        // 这里的检测的是等待发送的时间是否超时
                         long costTime = beginTimestampPrev - beginTimestampFirst;
                         if (timeout < costTime) {
                             callTimeout = true;
@@ -775,6 +779,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                         continue;
                     } catch (RemotingException e) {
                         endTimestamp = System.currentTimeMillis();
+                        // 启动了探活的情况下，还产生了RemotingException，将broker设置为不可达
                         if (this.mqFaultStrategy.isStartDetectorEnable()) {
                             // Set this broker unreachable when detecting schedule task is running for RemotingException.
                             this.updateFaultItem(mq.getBrokerName(), endTimestamp - beginTimestampPrev, true, false);
