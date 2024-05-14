@@ -377,6 +377,7 @@ public class AsyncTraceDispatcher implements TraceDispatcher {
         }
     }
 
+    // 异步 发送trace消息 任务
     class AsyncDataSendTask implements Runnable {
         private final String traceTopicName;
         private final String regionId;

@@ -48,6 +48,7 @@ public class ProduceAccumulator {
     // holdSize normal value
     private long holdSize = 32 * 1024;
     // holdMs normal value
+    //
     private int holdMs = 10;
     private final Logger log = LoggerFactory.getLogger(DefaultMQProducer.class);
     private final GuardForSyncSendService guardThreadForSyncSend;
@@ -90,11 +91,15 @@ public class ProduceAccumulator {
 
         private void doWork() throws InterruptedException {
             Collection<MessageAccumulation> values = syncSendBatchs.values();
+            // todo sleepTime最好要减去遍历每个MessageAccumulation的耗时，这样的计时才是准的
+            // 将holdMs/2的原因是为了延迟发送的时间大概率不超过1.5holdMs
             final int sleepTime = Math.max(1, holdMs / 2);
             for (MessageAccumulation v : values) {
+                // 尽快的先让add方法send一次，因为后面要获取两个锁，耗时肯定比获取一个锁要长
                 v.wakeup();
                 synchronized (v) {
                     synchronized (v.closed) {
+                        // 没有要发送的消息时，关闭MessageAccumulation，否则再次让add尝试send
                         if (v.messagesSize.get() == 0) {
                             v.closed.set(true);
                             syncSendBatchs.remove(v.aggregateKey, v);
@@ -367,6 +372,8 @@ public class ProduceAccumulator {
                 }
             }
             synchronized (this) {
+                // 尝试发送，如果batch大小没有达到阈值，且等待时间也没有超过阈值，则释放锁（MessageAccumulation对象）等待唤醒
+                // 会有一个线程来调用notify释放
                 while (!this.closed.get()) {
                     if (readyToSend()) {
                         this.send();
@@ -397,6 +404,7 @@ public class ProduceAccumulator {
 
         }
 
+        // 让出锁让add方法能尝试send
         public synchronized void wakeup() {
             if (this.closed.get()) {
                 return;
@@ -415,6 +423,7 @@ public class ProduceAccumulator {
             return messageBatch;
         }
 
+        // 将批量发送的结果拆分为多个
         private void splitSendResults(SendResult sendResult) {
             if (sendResult == null) {
                 throw new IllegalArgumentException("sendResult is null");
@@ -439,6 +448,7 @@ public class ProduceAccumulator {
             }
         }
 
+        // 批量发送
         private void send() throws InterruptedException, MQClientException, MQBrokerException, RemotingException {
             synchronized (this.closed) {
                 if (this.closed.getAndSet(true)) {

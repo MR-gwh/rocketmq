@@ -147,11 +147,13 @@ public class DefaultMQProducer extends ClientConfig implements MQProducer {
     private boolean autoBatch = false;
     /**
      * Instance for batching message automatically
+     * 自动批量发送消息时的消息缓冲区，类似于kafka里的缓冲区的作用
      */
     private ProduceAccumulator produceAccumulator = null;
 
     /**
      * Indicate whether to block message when asynchronous sending traffic is too heavy.
+     * 异步模式下的背压，用于做流量限制
      */
     private boolean enableBackpressureForAsyncMode = false;
 
@@ -329,6 +331,7 @@ public class DefaultMQProducer extends ClientConfig implements MQProducer {
         if (this.produceAccumulator != null) {
             this.produceAccumulator.start();
         }
+        // 开启了消息追踪的情况下，创建dispatcher用于转发轨迹消息
         if (enableTrace) {
             try {
                 AsyncTraceDispatcher dispatcher = new AsyncTraceDispatcher(producerGroup, TraceDispatcher.Type.PRODUCE, traceTopic, rpcHook);
@@ -443,6 +446,7 @@ public class DefaultMQProducer extends ClientConfig implements MQProducer {
     public SendResult send(Message msg,
         long timeout) throws MQClientException, RemotingException, MQBrokerException, InterruptedException {
         msg.setTopic(withNamespace(msg.getTopic()));
+        // 带超时的发送方法不适合使用批量发送，因此直接使用impl的发送方法即可
         return this.defaultMQProducerImpl.send(msg, timeout);
     }
 
@@ -706,6 +710,7 @@ public class DefaultMQProducer extends ClientConfig implements MQProducer {
         this.defaultMQProducerImpl.send(msg, selector, arg, sendCallback, timeout);
     }
 
+    // 立即发送
     public SendResult sendDirect(Message msg, MessageQueue mq,
         SendCallback sendCallback) throws MQClientException, RemotingException, InterruptedException, MQBrokerException {
         // send in sync mode
@@ -725,6 +730,7 @@ public class DefaultMQProducer extends ClientConfig implements MQProducer {
         }
     }
 
+    // 批量发送
     public SendResult sendByAccumulator(Message msg, MessageQueue mq,
         SendCallback sendCallback) throws MQClientException, RemotingException, InterruptedException, MQBrokerException {
         // check whether it can batch
@@ -762,6 +768,7 @@ public class DefaultMQProducer extends ClientConfig implements MQProducer {
     public Message request(final Message msg, final long timeout) throws RequestTimeoutException, MQClientException,
         RemotingException, MQBrokerException, InterruptedException {
         msg.setTopic(withNamespace(msg.getTopic()));
+        // 等消费者消费完了才会返回一个message,类似于rpc调用，使用场景很少
         return this.defaultMQProducerImpl.request(msg, timeout);
     }
 

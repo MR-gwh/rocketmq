@@ -35,9 +35,12 @@ import org.apache.rocketmq.common.ThreadFactoryImpl;
 import org.apache.rocketmq.logging.org.slf4j.Logger;
 import org.apache.rocketmq.logging.org.slf4j.LoggerFactory;
 
+// 用以支持类rpc调用
 public class RequestFutureHolder {
     private static final Logger log = LoggerFactory.getLogger(RequestFutureHolder.class);
+    // 用以实现饿汉单例模式
     private static final RequestFutureHolder INSTANCE = new RequestFutureHolder();
+    // 类核心，存储消息的CorrelationId和RequestResponseFuture的对应关系
     private ConcurrentHashMap<String, RequestResponseFuture> requestFutureTable = new ConcurrentHashMap<>();
     private final Set<DefaultMQProducerImpl> producerSet = new HashSet<>();
     private ScheduledExecutorService scheduledExecutorService = null;
@@ -46,6 +49,7 @@ public class RequestFutureHolder {
         return requestFutureTable;
     }
 
+    // 扫描过期的消息发送请求，并执行request的callback
     private void scanExpiredRequest() {
         final List<RequestResponseFuture> rfList = new LinkedList<>();
         Iterator<Map.Entry<String, RequestResponseFuture>> it = requestFutureTable.entrySet().iterator();
@@ -71,6 +75,7 @@ public class RequestFutureHolder {
         }
     }
 
+    // 开启定时任务，每个1s就进行一次过期扫描
     public synchronized void startScheduledTask(DefaultMQProducerImpl producer) {
         this.producerSet.add(producer);
         if (null == scheduledExecutorService) {
@@ -90,6 +95,7 @@ public class RequestFutureHolder {
         }
     }
 
+    // 停止
     public synchronized void shutdown(DefaultMQProducerImpl producer) {
         this.producerSet.remove(producer);
         if (this.producerSet.size() <= 0 && null != this.scheduledExecutorService) {

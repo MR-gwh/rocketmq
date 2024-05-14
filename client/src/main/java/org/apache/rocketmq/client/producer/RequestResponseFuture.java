@@ -22,11 +22,14 @@ import java.util.concurrent.TimeUnit;
 import org.apache.rocketmq.common.message.Message;
 
 public class RequestResponseFuture {
+    // 在request-replay场景下，用以关联request和replay
     private final String correlationId;
+    // 获取响应时的回调，对replay进行处理
     private final RequestCallback requestCallback;
     private final long beginTimestamp = System.currentTimeMillis();
     private final Message requestMsg = null;
     private long timeoutMillis;
+    // 用以支持同步模式的request-replay场景
     private CountDownLatch countDownLatch = new CountDownLatch(1);
     private volatile Message responseMsg = null;
     private volatile boolean sendRequestOk = true;
