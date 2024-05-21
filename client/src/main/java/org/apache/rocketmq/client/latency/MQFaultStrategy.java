@@ -143,11 +143,13 @@ public class MQFaultStrategy {
             if (resetIndex) {
                 tpInfo.resetIndex();
             }
+            // availableFilter 会判断当前时间是否大于设定的故障预期恢复时间，只有大于时才认为是可用的
             MessageQueue mq = tpInfo.selectOneMessageQueue(availableFilter, brokerFilter);
             if (mq != null) {
                 return mq;
             }
 
+            // broker都还没有达到恢复时间，那就找一个可达的，且不是上一次使用过的 broker
             mq = tpInfo.selectOneMessageQueue(reachableFilter, brokerFilter);
             if (mq != null) {
                 return mq;
