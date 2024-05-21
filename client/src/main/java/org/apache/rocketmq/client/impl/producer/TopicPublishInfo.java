@@ -81,6 +81,7 @@ public class TopicPublishInfo {
             return null;
         }
 
+        // 遍历mq列表，直到找到一个通过filter能
         if (filter != null && filter.length != 0) {
             for (int i = 0; i < messageQueueList.size(); i++) {
                 int index = Math.abs(sendQueue.incrementAndGet() % messageQueueList.size());

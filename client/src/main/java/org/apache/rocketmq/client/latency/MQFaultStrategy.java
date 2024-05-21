@@ -36,6 +36,7 @@ public class MQFaultStrategy {
             this.lastBrokerName = lastBrokerName;
         }
 
+        // 不能是上一次已经遍历到的broker
         @Override public boolean filter(MessageQueue mq) {
             if (lastBrokerName != null) {
                 return !mq.getBrokerName().equals(lastBrokerName);

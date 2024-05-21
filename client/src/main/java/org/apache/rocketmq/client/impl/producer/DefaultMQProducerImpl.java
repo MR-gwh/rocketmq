@@ -819,7 +819,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                         }
                         throw e;
                     }
-                } else {
+                }    else {
                     break;
                 }
             }
