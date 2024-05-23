@@ -574,8 +574,8 @@ public class DefaultMQProducerImpl implements MQProducerInner {
     }
 
     class BackpressureSendCallBack implements SendCallback {
-        public boolean isSemaphoreAsyncSizeAquired = false;
-        public boolean isSemaphoreAsyncNumAquired = false;
+        public boolean isSemaphoreAsyncSizeAcquired = false;
+        public boolean isSemaphoreAsyncNumbAcquired = false;
         public int msgLen;
         private final SendCallback sendCallback;
 
@@ -585,10 +585,10 @@ public class DefaultMQProducerImpl implements MQProducerInner {
 
         @Override
         public void onSuccess(SendResult sendResult) {
-            if (isSemaphoreAsyncSizeAquired) {
+            if (isSemaphoreAsyncSizeAcquired) {
                 semaphoreAsyncSendSize.release(msgLen);
             }
-            if (isSemaphoreAsyncNumAquired) {
+            if (isSemaphoreAsyncNumbAcquired) {
                 semaphoreAsyncSendNum.release();
             }
             sendCallback.onSuccess(sendResult);
@@ -597,10 +597,10 @@ public class DefaultMQProducerImpl implements MQProducerInner {
         @Override
         public void onException(Throwable e) {
             // 尝试释放占用的信号量
-            if (isSemaphoreAsyncSizeAquired) {
+            if (isSemaphoreAsyncSizeAcquired) {
                 semaphoreAsyncSendSize.release(msgLen);
             }
-            if (isSemaphoreAsyncNumAquired) {
+            if (isSemaphoreAsyncNumbAcquired) {
                 semaphoreAsyncSendNum.release();
             }
             sendCallback.onException(e);
@@ -612,32 +612,32 @@ public class DefaultMQProducerImpl implements MQProducerInner {
         throws MQClientException, InterruptedException {
         ExecutorService executor = this.getAsyncSenderExecutor();
         boolean isEnableBackpressureForAsyncMode = this.getDefaultMQProducer().isEnableBackpressureForAsyncMode();
-        boolean isSemaphoreAsyncNumAquired = false;
-        boolean isSemaphoreAsyncSizeAquired = false;
+        boolean isSemaphoreAsyncNumbAcquired = false;
+        boolean isSemaphoreAsyncSizeAcquired = false;
         int msgLen = msg.getBody() == null ? 1 : msg.getBody().length;
 
         try {
             // 开启了背压模式时，尝试获取信号量，获取失败则执行callback的异常处理方法
             if (isEnableBackpressureForAsyncMode) {
                 long costTime = System.currentTimeMillis() - beginStartTime;
-                isSemaphoreAsyncNumAquired = timeout - costTime > 0
+                isSemaphoreAsyncNumbAcquired = timeout - costTime > 0
                     && semaphoreAsyncSendNum.tryAcquire(timeout - costTime, TimeUnit.MILLISECONDS);
-                if (!isSemaphoreAsyncNumAquired) {
+                if (!isSemaphoreAsyncNumbAcquired) {
                     sendCallback.onException(
                         new RemotingTooMuchRequestException("send message tryAcquire semaphoreAsyncNum timeout"));
                     return;
                 }
                 costTime = System.currentTimeMillis() - beginStartTime;
-                isSemaphoreAsyncSizeAquired = timeout - costTime > 0
+                isSemaphoreAsyncSizeAcquired = timeout - costTime > 0
                     && semaphoreAsyncSendSize.tryAcquire(msgLen, timeout - costTime, TimeUnit.MILLISECONDS);
-                if (!isSemaphoreAsyncSizeAquired) {
+                if (!isSemaphoreAsyncSizeAcquired) {
                     sendCallback.onException(
                         new RemotingTooMuchRequestException("send message tryAcquire semaphoreAsyncSize timeout"));
                     return;
                 }
             }
-            sendCallback.isSemaphoreAsyncSizeAquired = isSemaphoreAsyncSizeAquired;
-            sendCallback.isSemaphoreAsyncNumAquired = isSemaphoreAsyncNumAquired;
+            sendCallback.isSemaphoreAsyncSizeAcquired = isSemaphoreAsyncSizeAcquired;
+            sendCallback.isSemaphoreAsyncNumbAcquired = isSemaphoreAsyncNumbAcquired;
             sendCallback.msgLen = msgLen;
             executor.submit(runnable);
         } catch (RejectedExecutionException e) {
@@ -819,7 +819,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                         }
                         throw e;
                     }
-                }    else {
+                } else {
                     break;
                 }
             }

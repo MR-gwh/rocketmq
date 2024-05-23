@@ -131,9 +131,9 @@ public class MQClientInstance {
     private final ConcurrentMap<String, HashMap<Long, String>> brokerAddrTable = new ConcurrentHashMap<>();
 
     private final ConcurrentMap<String/* Broker Name */, HashMap<String/* address */, Integer>> brokerVersionTable = new ConcurrentHashMap<>();
-    private final Set<String/* Broker address */> brokerSupportV2HeartbeatSet = new HashSet();
+    private final Set<String/* Broker address */> brokerSupportV2HeartbeatSet = new HashSet<>();
     // broker地址心跳指纹表
-    private final ConcurrentMap<String, Integer> brokerAddrHeartbeatFingerprintTable = new ConcurrentHashMap();
+    private final ConcurrentMap<String, Integer> brokerAddrHeartbeatFingerprintTable = new ConcurrentHashMap<>();
     private final ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor(r -> new Thread(r, "MQClientFactoryScheduledThread"));
     // 未使用，看上去是想开个拉取远程配置的线程
     private final ScheduledExecutorService fetchRemoteConfigExecutorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
