@@ -120,6 +120,7 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
      */
     private ExecutorService callbackExecutor;
     private final ChannelEventListener channelEventListener;
+    // 一个schedule线程池
     private EventExecutorGroup defaultEventExecutorGroup;
 
     public NettyRemotingClient(final NettyClientConfig nettyClientConfig) {
@@ -151,6 +152,7 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
         this.scanExecutor = ThreadUtils.newThreadPoolExecutor(4, 10, 60, TimeUnit.SECONDS,
             new ArrayBlockingQueue<>(32), new ThreadFactoryImpl("NettyClientScan_thread_"));
 
+        // netty客户端，只需要一个eventLoopGroup就行了
         if (eventLoopGroup != null) {
             this.eventLoopGroupWorker = eventLoopGroup;
         } else {
@@ -232,11 +234,14 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
                 nettyClientConfig.getWriteBufferLowWaterMark(), nettyClientConfig.getWriteBufferHighWaterMark()));
         }
         if (nettyClientConfig.isClientPooledByteBufAllocatorEnable()) {
+            // 使用池化的ByteBuf，减少内存的频繁分配和销毁
             handler.option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT);
         }
 
+        // 启动netty event处理线程
         nettyEventExecutor.start();
 
+        // 定时扫描响应
         TimerTask timerTaskScanResponseTable = new TimerTask() {
             @Override
             public void run(Timeout timeout) {
@@ -252,6 +257,7 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
         this.timer.newTimeout(timerTaskScanResponseTable, 1000 * 3, TimeUnit.MILLISECONDS);
 
         int connectTimeoutMillis = this.nettyClientConfig.getConnectTimeoutMillis();
+        // 定时扫描检测namesrv是否可用
         TimerTask timerTaskScanAvailableNameSrv = new TimerTask() {
             @Override
             public void run(Timeout timeout) {
@@ -726,6 +732,7 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
             invokeCallback.operationFail(new RemotingConnectException(addr));
             return;
         }
+        // listener里的future是channelFuture自身，也就是说只要建立连接完成了，就算是future完成了，就能够触发发送操作
         channelFuture.addListener(future -> {
             if (future.isSuccess()) {
                 Channel channel = channelFuture.channel();

@@ -670,6 +670,7 @@ public abstract class NettyRemotingAbstract {
         }
     }
 
+    // netty事件的处理任务，维护了一个队列暂存NettyEvent，并在run方法里不断取事件并使用注册listener来处理
     class NettyEventExecutor extends ServiceThread {
         private final LinkedBlockingQueue<NettyEvent> eventQueue = new LinkedBlockingQueue<>();
 
