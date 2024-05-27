@@ -269,6 +269,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
         long cachedMessageCount = processQueue.getMsgCount().get();
         long cachedMessageSizeInMiB = processQueue.getMsgSize().get() / (1024 * 1024);
 
+        // 限流
         if (cachedMessageCount > this.defaultMQPushConsumer.getPullThresholdForQueue()) {
             this.executePullRequestLater(pullRequest, PULL_TIME_DELAY_MILLS_WHEN_CACHE_FLOW_CONTROL);
             if ((queueFlowControlTimes++ % 1000) == 0) {
@@ -1034,6 +1035,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
         // 向brokerAddrTable里维护的所有的broker发送心跳，使用了可重入锁保证并发安全
         if (this.mQClientFactory.sendHeartbeatToAllBrokerWithLock()) {
             // 发送完心跳后，触发一次重平衡
+            // todo 是否有必要触发？因为发送心跳后触发NOTIFY_CONSUMER_IDS_CHANGED事件，触发一次重平衡
             this.mQClientFactory.rebalanceImmediately();
         }
     }

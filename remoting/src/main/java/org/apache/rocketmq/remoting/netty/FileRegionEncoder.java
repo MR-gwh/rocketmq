@@ -49,6 +49,7 @@ public class FileRegionEncoder extends MessageToByteEncoder<FileRegion> {
      * @param out the {@link io.netty.buffer.ByteBuf} into which the encoded message will be written
      * @throws Exception is thrown if an error occurs
      */
+    // 采用netty提供的组合的方式来减少拷贝
     @Override
     protected void encode(ChannelHandlerContext ctx, FileRegion msg, final ByteBuf out) throws Exception {
         WritableByteChannel writableByteChannel = new WritableByteChannel() {
@@ -83,6 +84,7 @@ public class FileRegionEncoder extends MessageToByteEncoder<FileRegion> {
         }
     }
 
+    // 组合的方式分配buffer
     @Override
     protected ByteBuf allocateBuffer(ChannelHandlerContext ctx, FileRegion msg, boolean preferDirect) throws Exception {
         ByteBufAllocator allocator = ctx.alloc();

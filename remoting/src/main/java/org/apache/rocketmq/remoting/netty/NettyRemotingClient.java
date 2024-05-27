@@ -760,6 +760,7 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
         if (channelFuture == null) {
             throw new RemotingConnectException(addr);
         }
+        // 无需同步发送消息，因此给channel设置监听器异步处理即可
         channelFuture.addListener(future -> {
             if (future.isSuccess()) {
                 Channel channel = channelFuture.channel();

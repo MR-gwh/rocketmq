@@ -456,6 +456,7 @@ public class RemotingCommand {
         int bodySize = this.body != null ? this.body.length : 0;
         int beginIndex = out.writerIndex();
         // skip 8 bytes
+        // 目的是将writerIndex前移8byte
         out.writeLong(0);
         int headerSize;
         if (SerializeType.ROCKETMQ == serializeTypeCurrentRPC) {

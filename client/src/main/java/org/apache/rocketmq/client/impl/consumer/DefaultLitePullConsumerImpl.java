@@ -282,6 +282,7 @@ public class DefaultLitePullConsumerImpl implements MQConsumerInner {
         return this.serviceState == ServiceState.RUNNING;
     }
 
+    // 为什么pull模式在start里不立即触发一次rebalance？猜测是因为没有发送心跳，无法确定此时的
     public synchronized void start() throws MQClientException {
         switch (this.serviceState) {
             case CREATE_JUST:
@@ -322,6 +323,7 @@ public class DefaultLitePullConsumerImpl implements MQConsumerInner {
             default:
                 break;
         }
+        this.mQClientFactory.rebalanceImmediately();
     }
 
     private void initMQClientFactory() throws MQClientException {
@@ -609,6 +611,7 @@ public class DefaultLitePullConsumerImpl implements MQConsumerInner {
 
             ConsumeRequest consumeRequest = consumeRequestCache.poll(endTime - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
 
+            // 还没到结束时间，拉取到了dropped的队列的消息，那么放弃并进行下一次拉取
             if (endTime - System.currentTimeMillis() > 0) {
                 while (consumeRequest != null && consumeRequest.getProcessQueue().isDropped()) {
                     consumeRequest = consumeRequestCache.poll(endTime - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
@@ -900,6 +903,7 @@ public class DefaultLitePullConsumerImpl implements MQConsumerInner {
 
                 processQueue.setLastPullTimestamp(System.currentTimeMillis());
 
+                // 限流，防止拉取速度大于消费速度，导致内存爆掉
                 if ((long) consumeRequestCache.size() * defaultLitePullConsumer.getPullBatchSize() > defaultLitePullConsumer.getPullThresholdForAll()) {
                     scheduledThreadPoolExecutor.schedule(this, PULL_TIME_DELAY_MILLS_WHEN_CACHE_FLOW_CONTROL, TimeUnit.MILLISECONDS);
                     if ((consumeRequestFlowControlTimes++ % 1000) == 0) {

@@ -46,6 +46,7 @@ public class AttributeKeys {
     public static final AttributeKey<String> PROXY_PROTOCOL_SERVER_PORT =
             AttributeKey.valueOf(HAProxyConstants.PROXY_PROTOCOL_SERVER_PORT);
 
+    // 这里的AttributeKey是一个int和 string组合类，int是递增唯一的
     private static final Map<String, AttributeKey<String>> ATTRIBUTE_KEY_MAP = new ConcurrentHashMap<>();
 
     public static AttributeKey<String> valueOf(String name) {
