@@ -48,6 +48,7 @@ import io.opentelemetry.sdk.metrics.ViewBuilder;
 
 /**
  * This class defines contracting interfaces to implement, allowing third-party vendor to use customized message store.
+ * 消息存储的抽象API，提供访问和存储消息的API
  */
 public interface MessageStore {
 

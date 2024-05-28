@@ -278,6 +278,7 @@ public class BrokerController {
     protected List<BrokerAttachedPlugin> brokerAttachedPlugins = new ArrayList<>();
     protected volatile long shouldStartTime;
     private BrokerPreOnlineService brokerPreOnlineService;
+    // 是否是隔离状态，如果是的话，不再向namesrv注册和发送心跳，也不会对外提供服务
     protected volatile boolean isIsolated = false;
     protected volatile long minBrokerIdInGroup = 0;
     protected volatile String minBrokerAddrInGroup = null;
@@ -474,6 +475,7 @@ public class BrokerController {
         return brokerMetricsManager;
     }
 
+    // 启动netty server
     protected void initializeRemotingServer() throws CloneNotSupportedException {
         this.remotingServer = new NettyRemotingServer(this.nettyServerConfig, this.clientHousekeepingService);
         NettyServerConfig fastConfig = (NettyServerConfig) this.nettyServerConfig.clone();
@@ -489,11 +491,13 @@ public class BrokerController {
 
     /**
      * Initialize resources including remoting server and thread executors.
+     * 创建了大量的线程池，用以处理各种类型的请求
      */
     protected void initializeResources() {
         this.scheduledExecutorService = ThreadUtils.newScheduledThreadPool(1,
             new ThreadFactoryImpl("BrokerControllerScheduledThread", true, getBrokerIdentity()));
 
+        // 处理生产者发送的消息的线程池
         this.sendMessageExecutor = ThreadUtils.newThreadPoolExecutor(
             this.brokerConfig.getSendMessageThreadPoolNums(),
             this.brokerConfig.getSendMessageThreadPoolNums(),
@@ -502,6 +506,7 @@ public class BrokerController {
             this.sendThreadPoolQueue,
             new ThreadFactoryImpl("SendMessageThread_", getBrokerIdentity()));
 
+        // 处理pull消息的请求
         this.pullMessageExecutor = ThreadUtils.newThreadPoolExecutor(
             this.brokerConfig.getPullMessageThreadPoolNums(),
             this.brokerConfig.getPullMessageThreadPoolNums(),
@@ -620,6 +625,7 @@ public class BrokerController {
             }
         }, initialDelay, period, TimeUnit.MILLISECONDS);
 
+        // 定时持久化consumer位移
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
             @Override
             public void run() {
@@ -636,7 +642,9 @@ public class BrokerController {
             @Override
             public void run() {
                 try {
+                    // 将consumer filter的元数据持久化为json格式文件
                     BrokerController.this.consumerFilterManager.persist();
+                    // 将consumer顺序消费的消费情况数据持久化为json文件
                     BrokerController.this.consumerOrderInfoManager.persist();
                 } catch (Throwable e) {
                     LOG.error(
@@ -646,6 +654,7 @@ public class BrokerController {
             }
         }, 1000 * 10, 1000 * 10, TimeUnit.MILLISECONDS);
 
+        // 定时将消费速度过慢的consumer移除订阅列表
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
             @Override
             public void run() {
@@ -657,6 +666,7 @@ public class BrokerController {
             }
         }, 3, 3, TimeUnit.MINUTES);
 
+        // 每秒打印一次水位线
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
             @Override
             public void run() {
@@ -668,6 +678,7 @@ public class BrokerController {
             }
         }, 10, 1, TimeUnit.SECONDS);
 
+        // 打印调度任务落后commit log多少bytes的数据
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
 
             @Override
@@ -681,6 +692,7 @@ public class BrokerController {
             }
         }, 1000 * 10, 1000 * 60, TimeUnit.MILLISECONDS);
 
+        // 非dleger模式、不允许重复复制，并且没有开启自动主从切换的情况下，从broker创建一个定时任务来同步主broker的数据，主broker创建定时任务打印从broker和自己的差异
         if (!messageStoreConfig.isEnableDLegerCommitLog() && !messageStoreConfig.isDuplicationEnable() && !brokerConfig.isEnableControllerMode()) {
             if (BrokerRole.SLAVE == this.messageStoreConfig.getBrokerRole()) {
                 if (this.messageStoreConfig.getHaMasterAddress() != null && this.messageStoreConfig.getHaMasterAddress().length() >= HA_ADDRESS_MIN_LENGTH) {
@@ -734,6 +746,7 @@ public class BrokerController {
 
         initializeBrokerScheduledTasks();
 
+        // 创建更新namesrv的定时任务，根据namesrv的获取方式采用不同的任务实现
         if (this.brokerConfig.getNamesrvAddr() != null) {
             this.updateNamesrvAddr();
             LOG.info("Set user specified name server address: {}", this.brokerConfig.getNamesrvAddr());
@@ -770,7 +783,7 @@ public class BrokerController {
             this.brokerOuterAPI.updateNameServerAddressList(this.brokerConfig.getNamesrvAddr());
         }
     }
-
+    // 从元数据管理器里加载持久化的json元数据
     public boolean initializeMetadata() {
         boolean result = this.topicConfigManager.load();
         result = result && this.topicQueueMappingManager.load();
@@ -927,6 +940,7 @@ public class BrokerController {
         return result;
     }
 
+    // 注册消息存储钩子，会在store消息时做前置检查和处理
     public void registerMessageStoreHook() {
         List<PutMessageHook> putMessageHookList = messageStore.getPutMessageHookList();
 
@@ -1731,6 +1745,7 @@ public class BrokerController {
                         BrokerController.LOG.info("Skip register for broker is isolated");
                         return;
                     }
+                    // 注册broker到所有的namesrv上
                     BrokerController.this.registerBrokerAll(true, false, brokerConfig.isForceRegister());
                 } catch (Throwable e) {
                     BrokerController.LOG.error("registerBrokerAll Exception", e);
@@ -1745,6 +1760,7 @@ public class BrokerController {
                 @Override
                 public void run0() {
                     try {
+                        // 同步副本组
                         BrokerController.this.syncBrokerMemberGroup();
                     } catch (Throwable e) {
                         BrokerController.LOG.error("sync BrokerMemberGroup error. ", e);
@@ -1765,6 +1781,7 @@ public class BrokerController {
             @Override
             public void run() {
                 try {
+                    // 5s刷新一次元数据
                     BrokerController.this.brokerOuterAPI.refreshMetadata();
                 } catch (Exception e) {
                     LOG.error("ScheduledTask refresh metadata exception", e);
