@@ -20,6 +20,7 @@ package org.apache.rocketmq.remoting.netty;
 import io.netty.channel.Channel;
 import org.apache.rocketmq.remoting.protocol.RemotingCommand;
 
+// 请求任务封装增强类，封装了完成一些远程调用需要使用的上下文
 public class RequestTask implements Runnable {
     private final Runnable runnable;
     private final long createTimestamp = System.currentTimeMillis();

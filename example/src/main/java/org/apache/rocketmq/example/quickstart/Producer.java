@@ -16,6 +16,8 @@
  */
 package org.apache.rocketmq.example.quickstart;
 
+import org.apache.rocketmq.acl.common.AclClientRPCHook;
+import org.apache.rocketmq.acl.common.SessionCredentials;
 import org.apache.rocketmq.client.exception.MQClientException;
 import org.apache.rocketmq.client.producer.DefaultMQProducer;
 import org.apache.rocketmq.client.producer.SendResult;
@@ -41,7 +43,7 @@ public class Producer {
         /*
          * Instantiate with a producer group name.
          */
-        DefaultMQProducer producer = new DefaultMQProducer(PRODUCER_GROUP);
+        DefaultMQProducer producer = new DefaultMQProducer(PRODUCER_GROUP,new AclClientRPCHook(new SessionCredentials("gaoweihao","12345678")));
 
         /*
          * Specify name server addresses.

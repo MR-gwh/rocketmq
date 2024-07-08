@@ -80,6 +80,7 @@ public class Broker2Client {
         return this.brokerController.getRemotingServer().invokeSync(channel, request, 10000);
     }
 
+    // 通知consumer进行rebalance，往往在consumer发生变化，或者consumer的订阅关系发生变化时发送
     public void notifyConsumerIdsChanged(
         final Channel channel,
         final String consumerGroup) {
@@ -94,6 +95,7 @@ public class Broker2Client {
             RemotingCommand.createRequestCommand(RequestCode.NOTIFY_CONSUMER_IDS_CHANGED, requestHeader);
 
         try {
+            // 直接推送一次，不管是否consumer是否接收到了，由consumer自己的定时任务兜底
             this.brokerController.getRemotingServer().invokeOneway(channel, request, 10);
         } catch (Exception e) {
             log.error("notifyConsumerIdsChanged exception. group={}, error={}", consumerGroup, e.toString());
@@ -105,6 +107,7 @@ public class Broker2Client {
         return resetOffset(topic, group, timeStamp, isForce, false);
     }
 
+    // 根据时间戳重置消费组的offset，-1代表最大时间戳位移
     public RemotingCommand resetOffset(String topic, String group, long timeStamp, boolean isForce,
         boolean isC) {
         final RemotingCommand response = RemotingCommand.createResponseCommand(null);
@@ -134,6 +137,7 @@ public class Broker2Client {
             }
 
             long timeStampOffset;
+            // 带时间戳的情况下先找到大于等于指定时间戳的最小offset，如果是-1则直接取queue的最大位移
             if (timeStamp == -1) {
 
                 timeStampOffset = this.brokerController.getMessageStore().getMaxOffsetInQueue(topic, i);
@@ -146,6 +150,7 @@ public class Broker2Client {
                 timeStampOffset = 0;
             }
 
+            // 设置了强制替换的情况下直接使用timeStampOffset，否则限制了位移只能回退或不变，不能前移
             if (isForce || timeStampOffset < consumerOffset) {
                 offsetTable.put(mq, timeStampOffset);
             } else {
@@ -159,6 +164,7 @@ public class Broker2Client {
         requestHeader.setTimestamp(timeStamp);
         RemotingCommand request =
             RemotingCommand.createRequestCommand(RequestCode.RESET_CONSUMER_CLIENT_OFFSET, requestHeader);
+        // 兼容c语言客户端
         if (isC) {
             // c++ language
             ResetOffsetBodyForC body = new ResetOffsetBodyForC();
@@ -175,6 +181,7 @@ public class Broker2Client {
         ConsumerGroupInfo consumerGroupInfo =
             this.brokerController.getConsumerManager().getConsumerGroupInfo(group);
 
+        // 向所有建立了连接的consumer发送reset后的结果
         if (consumerGroupInfo != null && !consumerGroupInfo.getAllChannel().isEmpty()) {
             ConcurrentMap<Channel, ClientChannelInfo> channelInfoTable =
                 consumerGroupInfo.getChannelInfoTable();

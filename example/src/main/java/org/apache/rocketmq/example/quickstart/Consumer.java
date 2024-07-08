@@ -16,6 +16,8 @@
  */
 package org.apache.rocketmq.example.quickstart;
 
+import org.apache.rocketmq.acl.common.AclClientRPCHook;
+import org.apache.rocketmq.acl.common.SessionCredentials;
 import org.apache.rocketmq.client.consumer.DefaultMQPushConsumer;
 import org.apache.rocketmq.client.consumer.listener.ConsumeConcurrentlyStatus;
 import org.apache.rocketmq.client.consumer.listener.MessageListenerConcurrently;
@@ -36,7 +38,7 @@ public class Consumer {
         /*
          * Instantiate with specified consumer group name.
          */
-        DefaultMQPushConsumer consumer = new DefaultMQPushConsumer(CONSUMER_GROUP);
+        DefaultMQPushConsumer consumer = new DefaultMQPushConsumer(CONSUMER_GROUP,new AclClientRPCHook(new SessionCredentials("gaoweihao","12345678")));
 
         /*
          * Specify name server addresses.

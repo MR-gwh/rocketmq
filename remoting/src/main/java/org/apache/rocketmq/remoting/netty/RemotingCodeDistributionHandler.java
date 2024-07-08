@@ -27,6 +27,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.LongAdder;
 import org.apache.rocketmq.remoting.protocol.RemotingCommand;
 
+// 用于统计channel 出站和入站请求数量
 @ChannelHandler.Sharable
 public class RemotingCodeDistributionHandler extends ChannelDuplexHandler {
 

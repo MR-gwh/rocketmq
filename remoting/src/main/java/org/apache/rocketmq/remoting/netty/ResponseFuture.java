@@ -27,6 +27,7 @@ import org.apache.rocketmq.remoting.exception.RemotingSendRequestException;
 import org.apache.rocketmq.remoting.exception.RemotingTimeoutException;
 import org.apache.rocketmq.remoting.protocol.RemotingCommand;
 
+// 用于异步通信场景，包含了一次网络IO的完整上下文信息：请求、响应、channel，回调
 public class ResponseFuture {
     private final Channel channel;
     private final int opaque;

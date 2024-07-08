@@ -22,6 +22,7 @@ import org.apache.rocketmq.remoting.protocol.heartbeat.SubscriptionData;
 
 import java.util.Arrays;
 
+// 用于解析消息过滤配置和信息，生成相关的订阅信息
 public class FilterAPI {
 
     public static SubscriptionData buildSubscriptionData(String topic, String subString) throws Exception {
