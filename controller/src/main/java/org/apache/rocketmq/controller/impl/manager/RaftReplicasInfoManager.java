@@ -77,18 +77,22 @@ public class RaftReplicasInfoManager extends ReplicasInfoManager {
         return result;
     }
 
+    // 处理broker发送的心跳
     public ControllerResult<RaftBrokerHeartBeatEventResponse> onBrokerHeartBeat(
         RaftBrokerHeartBeatEventRequest request) {
         BrokerIdentityInfo brokerIdentityInfo = request.getBrokerIdentityInfo();
         BrokerLiveInfo brokerLiveInfo = request.getBrokerLiveInfo();
         ControllerResult<RaftBrokerHeartBeatEventResponse> result = new ControllerResult<>(new RaftBrokerHeartBeatEventResponse());
+        // brokerLiveTable里没有该broker信息时，添加到table里
         BrokerLiveInfo prev = brokerLiveTable.computeIfAbsent(brokerIdentityInfo, identityInfo -> {
             log.info("new broker registered, brokerIdentityInfo: {}", identityInfo);
             return brokerLiveInfo;
         });
+        // 更新缓存的心跳信息
         prev.setLastUpdateTimestamp(brokerLiveInfo.getLastUpdateTimestamp());
         prev.setHeartbeatTimeoutMillis(brokerLiveInfo.getHeartbeatTimeoutMillis());
         prev.setElectionPriority(brokerLiveInfo.getElectionPriority());
+        // 更新broker的同步进度
         if (brokerLiveInfo.getEpoch() > prev.getEpoch() || brokerLiveInfo.getEpoch() == prev.getEpoch() && brokerLiveInfo.getMaxOffset() > prev.getMaxOffset()) {
             prev.setEpoch(brokerLiveInfo.getEpoch());
             prev.setMaxOffset(brokerLiveInfo.getMaxOffset());
@@ -97,6 +101,7 @@ public class RaftReplicasInfoManager extends ReplicasInfoManager {
         return result;
     }
 
+    // broker主动断开连接时，将本地缓存清除
     public ControllerResult<BrokerCloseChannelResponse> onBrokerCloseChannel(BrokerCloseChannelRequest request) {
         BrokerIdentityInfo brokerIdentityInfo = request.getBrokerIdentityInfo();
         ControllerResult<BrokerCloseChannelResponse> result = new ControllerResult<>(new BrokerCloseChannelResponse());
@@ -109,6 +114,7 @@ public class RaftReplicasInfoManager extends ReplicasInfoManager {
         return result;
     }
 
+    // 扫描不活跃的broker，以及需要进行elect的broker集群
     public ControllerResult<CheckNotActiveBrokerResponse> checkNotActiveBroker(CheckNotActiveBrokerRequest request) {
         List<BrokerIdentityInfo> notActiveBrokerIdentityInfoList = new ArrayList<>();
         long checkTime = request.getCheckTimeMillis();
