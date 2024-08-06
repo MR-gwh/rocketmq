@@ -1387,6 +1387,7 @@ public class TimerMessageStore {
             while (!isStopped()) {
                 CountDownLatch latch = new CountDownLatch(trs.size());
                 for (TimerRequest req : trs) {
+                    // 用以幂等的调用req.release方法
                     req.setLatch(latch);
                     this.putMessageToTimerWheel(req);
                 }

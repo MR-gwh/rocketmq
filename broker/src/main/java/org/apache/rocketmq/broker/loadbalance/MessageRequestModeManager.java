@@ -23,6 +23,7 @@ import org.apache.rocketmq.common.ConfigManager;
 import org.apache.rocketmq.remoting.protocol.RemotingSerializable;
 import org.apache.rocketmq.remoting.protocol.body.SetMessageRequestModeRequestBody;
 
+// 维护topic+consumerGroup维度的consume模式信息，会持久化到messageRequestMode.json文件里（文件路径可以在BrokerPathConfigHelper里查询）
 public class MessageRequestModeManager extends ConfigManager {
 
     private transient BrokerController brokerController;

@@ -31,6 +31,7 @@ import org.apache.rocketmq.logging.org.slf4j.Logger;
 import org.apache.rocketmq.logging.org.slf4j.LoggerFactory;
 import org.apache.rocketmq.remoting.protocol.heartbeat.SubscriptionData;
 
+// 监听consumerGroup成员的变化并通知consumer进行rebalance
 public class DefaultConsumerIdsChangeListener implements ConsumerIdsChangeListener {
     private static final Logger log = LoggerFactory.getLogger(LoggerName.BROKER_LOGGER_NAME);
     private final BrokerController brokerController;

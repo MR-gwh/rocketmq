@@ -95,6 +95,7 @@ import static org.apache.rocketmq.remoting.metrics.RemotingMetricsConstant.LABEL
 import static org.apache.rocketmq.remoting.metrics.RemotingMetricsConstant.LABEL_RESPONSE_CODE;
 import static org.apache.rocketmq.remoting.metrics.RemotingMetricsConstant.LABEL_RESULT;
 
+// 从队列里查出消息分发给consumer
 public class PopMessageProcessor implements NettyRequestProcessor {
     private static final Logger POP_LOGGER =
         LoggerFactory.getLogger(LoggerName.ROCKETMQ_POP_LOGGER_NAME);

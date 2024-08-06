@@ -38,6 +38,7 @@ import org.apache.rocketmq.logging.org.slf4j.LoggerFactory;
 import org.apache.rocketmq.remoting.protocol.DataVersion;
 import org.apache.rocketmq.remoting.protocol.RemotingSerializable;
 
+// 管理和维护消费者消费位移信息，并持久化到了consumerOffset.json里
 public class ConsumerOffsetManager extends ConfigManager {
     protected static final Logger LOG = LoggerFactory.getLogger(LoggerName.BROKER_LOGGER_NAME);
     public static final String TOPIC_GROUP_SEPARATOR = "@";

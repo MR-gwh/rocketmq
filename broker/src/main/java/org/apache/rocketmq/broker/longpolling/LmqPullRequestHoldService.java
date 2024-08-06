@@ -23,6 +23,7 @@ import org.apache.rocketmq.logging.org.slf4j.Logger;
 import org.apache.rocketmq.logging.org.slf4j.LoggerFactory;
 
 
+// 支持轻量消息队列Light message queue下的pull场景
 public class LmqPullRequestHoldService extends PullRequestHoldService {
     private static final Logger LOGGER = LoggerFactory.getLogger(LoggerName.BROKER_LOGGER_NAME);
 
@@ -50,11 +51,13 @@ public class LmqPullRequestHoldService extends PullRequestHoldService {
             int queueId = Integer.parseInt(key.substring(idx + 1));
             final long offset = brokerController.getMessageStore().getMaxOffsetInQueue(topic, queueId);
             try {
+                // 通知客户端并返回消息
                 this.notifyMessageArriving(topic, queueId, offset);
             } catch (Throwable e) {
                 LOGGER.error("check hold request failed. topic={}, queueId={}", topic, queueId, e);
             }
             if (MixAll.isLmq(topic)) {
+                // 没有pullRequest说明没有消费者要消费里，及时就从pullRequestTable里移除 topic@queueid, ManyPullRequest的entry
                 ManyPullRequest mpr = pullRequestTable.get(key);
                 if (mpr == null || mpr.getPullRequestList() == null || mpr.getPullRequestList().isEmpty()) {
                     pullRequestTable.remove(key);

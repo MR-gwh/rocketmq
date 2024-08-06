@@ -44,6 +44,7 @@ import org.apache.rocketmq.store.pop.AckMsg;
 import org.apache.rocketmq.store.pop.BatchAckMsg;
 import org.apache.rocketmq.store.pop.PopCheckPoint;
 
+// pop模式下用以合并ACK和CK消息，标记CK中的消息被ACK了
 public class PopBufferMergeService extends ServiceThread {
     private static final Logger POP_LOGGER = LoggerFactory.getLogger(LoggerName.ROCKETMQ_POP_LOGGER_NAME);
     ConcurrentHashMap<String/*mergeKey*/, PopCheckPointWrapper>

@@ -61,6 +61,7 @@ import static org.apache.rocketmq.broker.metrics.BrokerMetricsConstant.LABEL_CON
 import static org.apache.rocketmq.broker.metrics.BrokerMetricsConstant.LABEL_IS_SYSTEM;
 import static org.apache.rocketmq.broker.metrics.BrokerMetricsConstant.LABEL_TOPIC;
 
+// 负责让超过不可见时间的消息恢复为重新可见
 public class PopReviveService extends ServiceThread {
     private static final Logger POP_LOGGER = LoggerFactory.getLogger(LoggerName.ROCKETMQ_POP_LOGGER_NAME);
 

@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+// 对topic的queue加锁，在异步并发的向commit log添加msg进行加锁，解决线程安全问题
 public class TopicQueueLock {
     private final int size;
     private final List<Lock> lockList;

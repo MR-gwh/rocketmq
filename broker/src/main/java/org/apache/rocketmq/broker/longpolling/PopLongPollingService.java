@@ -44,6 +44,7 @@ import static org.apache.rocketmq.broker.longpolling.PollingResult.POLLING_FULL;
 import static org.apache.rocketmq.broker.longpolling.PollingResult.POLLING_SUC;
 import static org.apache.rocketmq.broker.longpolling.PollingResult.POLLING_TIMEOUT;
 
+// 挂起pop请求已经在合适的时机唤醒并由processor执行popRequest
 public class PopLongPollingService extends ServiceThread {
     private static final Logger POP_LOGGER =
         LoggerFactory.getLogger(LoggerName.ROCKETMQ_POP_LOGGER_NAME);
