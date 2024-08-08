@@ -22,6 +22,7 @@ import org.apache.rocketmq.common.constant.LoggerName;
 import org.apache.rocketmq.logging.org.slf4j.Logger;
 import org.apache.rocketmq.logging.org.slf4j.LoggerFactory;
 
+// 一个任务service类，会一定的interval来调用transactionalMessageService#batchSendOpMessage方法
 public class TransactionalOpBatchService extends ServiceThread {
     private static final Logger LOGGER = LoggerFactory.getLogger(LoggerName.TRANSACTION_LOGGER_NAME);
 
@@ -60,6 +61,7 @@ public class TransactionalOpBatchService extends ServiceThread {
 
     @Override
     protected void onWaitEnd() {
+        // 批量发送op msg同时更新下次的唤醒时间
         wakeupTimestamp = transactionalMessageService.batchSendOpMessage();
     }
 }

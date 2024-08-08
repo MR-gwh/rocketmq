@@ -158,6 +158,7 @@ public class TransactionalMessageServiceImpl implements TransactionalMessageServ
         }
     }
 
+    // 检查半事务消息，尝试获取消息的事务终态
     @Override
     public void check(long transactionTimeout, int transactionCheckMax,
         AbstractTransactionalMessageCheckListener listener) {
@@ -306,6 +307,7 @@ public class TransactionalMessageServiceImpl implements TransactionalMessageServ
                                     msgExt.getUserProperty(MessageConst.PROPERTY_REAL_TOPIC),
                                     msgExt.getUserProperty(MessageConst.PROPERTY_UNIQ_CLIENT_MESSAGE_ID_KEYIDX),
                                     msgExt.getQueueOffset(), msgExt.getCommitLogOffset());
+                            // 这里真正请求producer并获取到事务消息的状态
                             listener.resolveHalfMsg(msgExt);
                         } else {
                             nextOpOffset = pullResult != null ? pullResult.getNextBeginOffset() : nextOpOffset;
@@ -660,6 +662,7 @@ public class TransactionalMessageServiceImpl implements TransactionalMessageServ
         int moreDataLength = moreData != null ? moreData.length() : 0;
         int length = moreDataLength;
         int maxSize = transactionalMessageBridge.getBrokerController().getBrokerConfig().getTransactionOpMsgMaxSize();
+        // 消息体的size最大为maxSize + 100，这里逻辑有些莫名奇妙
         if (length < maxSize) {
             int sz = mqContext.getTotalSize().get();
             if (sz > maxSize || length + sz > maxSize) {
@@ -675,6 +678,7 @@ public class TransactionalMessageServiceImpl implements TransactionalMessageServ
             sb.append(moreData);
         }
 
+        // 从上下文里获取队列，并将其中的内容尽可能的放到msg的body里
         while (!mqContext.getContextQueue().isEmpty()) {
             if (sb.length() >= maxSize) {
                 break;
@@ -695,6 +699,7 @@ public class TransactionalMessageServiceImpl implements TransactionalMessageServ
         return new Message(opTopic, TransactionalMessageUtil.REMOVE_TAG,
                 sb.toString().getBytes(TransactionalMessageUtil.CHARSET));
     }
+
     public long batchSendOpMessage() {
         long startTime = System.currentTimeMillis();
         try {

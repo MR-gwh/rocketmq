@@ -57,6 +57,7 @@ import static org.apache.rocketmq.broker.metrics.BrokerMetricsConstant.LABEL_CON
 import static org.apache.rocketmq.broker.metrics.BrokerMetricsConstant.LABEL_IS_SYSTEM;
 import static org.apache.rocketmq.broker.metrics.BrokerMetricsConstant.LABEL_TOPIC;
 
+// 支持特殊消息逃逸——事务消息
 public class TransactionalMessageBridge {
     private static final Logger LOGGER = LoggerFactory.getLogger(LoggerName.TRANSACTION_LOGGER_NAME);
 
@@ -216,6 +217,7 @@ public class TransactionalMessageBridge {
         return store.asyncPutMessage(parseHalfMessageInner(messageInner));
     }
 
+    // 将消息转换为半事务消息并写入sys topic里
     private MessageExtBrokerInner parseHalfMessageInner(MessageExtBrokerInner msgInner) {
         String uniqId = msgInner.getUserProperty(MessageConst.PROPERTY_UNIQ_CLIENT_MESSAGE_ID_KEYIDX);
         if (uniqId != null && !uniqId.isEmpty()) {
@@ -317,6 +319,7 @@ public class TransactionalMessageBridge {
         return topicConfig;
     }
 
+    // 写入op消息，标志half transaction message已经达到终态，不管是commit还是rollback
     public boolean writeOp(Integer queueId,Message message) {
         MessageQueue opQueue = opQueueMap.get(queueId);
         if (opQueue == null) {
@@ -351,7 +354,9 @@ public class TransactionalMessageBridge {
         return brokerController;
     }
 
+    // 事务消息逃逸
     public boolean escapeMessage(MessageExtBrokerInner messageInner) {
+        // 路由目标的master建立bridge，然后投递事务消息
         PutMessageResult putMessageResult = this.brokerController.getEscapeBridge().putMessage(messageInner);
         if (putMessageResult != null && putMessageResult.isOk()) {
             return true;

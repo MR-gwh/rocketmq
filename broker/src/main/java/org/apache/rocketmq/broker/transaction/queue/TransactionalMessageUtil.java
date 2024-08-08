@@ -46,6 +46,7 @@ public class TransactionalMessageUtil {
         return MixAll.CID_SYS_RMQ_TRANS;
     }
 
+    // 用半事务消息组装事务消息
     public static MessageExtBrokerInner buildTransactionalMessageFromHalfMessage(MessageExt msgExt) {
         final MessageExtBrokerInner msgInner = new MessageExtBrokerInner();
         msgInner.setWaitStoreMsgOK(false);
