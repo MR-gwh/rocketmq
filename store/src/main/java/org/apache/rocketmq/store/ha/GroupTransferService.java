@@ -33,7 +33,7 @@ import org.apache.rocketmq.store.ha.autoswitch.AutoSwitchHAConnection;
 import org.apache.rocketmq.store.ha.autoswitch.AutoSwitchHAService;
 
 /**
- * GroupTransferService Service
+ * GroupTransferService Service 用来判断commitlog是否同步到了slave，借助该service，以支持自定义同步成功的最小slave个数
  */
 public class GroupTransferService extends ServiceThread {
 

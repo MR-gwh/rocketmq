@@ -58,6 +58,7 @@ import org.apache.rocketmq.store.util.LibC;
 import sun.misc.Unsafe;
 import sun.nio.ch.DirectBuffer;
 
+// 将file以mmap的方式映射到内存的工具类
 public class DefaultMappedFile extends AbstractMappedFile {
     public static final int OS_PAGE_SIZE = 1024 * 4;
     public static final Unsafe UNSAFE = getUnsafe();

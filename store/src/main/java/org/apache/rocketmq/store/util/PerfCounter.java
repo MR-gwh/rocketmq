@@ -127,7 +127,7 @@ public class PerfCounter {
         if (cost < 1000) {
             return (int) cost;
         }
-        if (cost >= 1000 && cost < 1000 + 1000 * 10) {
+        if (cost < 1000 + 1000 * 10) {
             int units = (int) ((cost - 1000) / 10);
             return 1000 + units;
         }
@@ -142,7 +142,7 @@ public class PerfCounter {
     private int convert(int index) {
         if (index < 1000) {
             return index;
-        } else if (index >= 1000 && index < 2000) {
+        } else if (index < 2000) {
             return (index - 1000) * 10 + 1000;
         } else {
             return (index - 2000) * 100 + 1000 * 10 + 1000;
