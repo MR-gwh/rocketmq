@@ -832,6 +832,7 @@ public class BrokerController {
         return result;
     }
 
+    // 核心处理，初始化元数据，以及启动broker server
     public boolean initialize() throws CloneNotSupportedException {
 
         boolean result = this.initializeMetadata();

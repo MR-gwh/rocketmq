@@ -1256,6 +1256,7 @@ public class CommitLog implements Swappable {
             return false;
         }
 
+        // todo 每次都是重头开始消费，可以接受比较多的消息丢失？
         if (this.defaultMessageStore.getMessageStoreConfig().isDuplicationEnable()) {
             return false;
         }
