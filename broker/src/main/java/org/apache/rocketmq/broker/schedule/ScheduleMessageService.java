@@ -103,6 +103,7 @@ public class ScheduleMessageService extends ConfigManager {
         return delayLevel - 1;
     }
 
+    // 遍历offsetTable，获取每个延迟队列的maxOffset和最近一条已经被处理的延迟消息offset
     public void buildRunningStats(HashMap<String, String> stats) {
         for (Map.Entry<Integer, Long> next : this.offsetTable.entrySet()) {
             int queueId = delayLevel2QueueId(next.getKey());
@@ -114,6 +115,7 @@ public class ScheduleMessageService extends ConfigManager {
         }
     }
 
+    // 更新对应的延迟队列queue的offset
     private void updateOffset(int delayLevel, long offset) {
         this.offsetTable.put(delayLevel, offset);
         if (versionChangeCounter.incrementAndGet() % brokerController.getBrokerConfig().getDelayOffsetUpdateVersionStep() == 0) {
@@ -122,6 +124,7 @@ public class ScheduleMessageService extends ConfigManager {
         }
     }
 
+    // 计算消息预计的投递时间
     public long computeDeliverTimestamp(final int delayLevel, final long storeTimestamp) {
         Long time = this.delayLevelTable.get(delayLevel);
         if (time != null) {
@@ -133,11 +136,14 @@ public class ScheduleMessageService extends ConfigManager {
 
     public void start() {
         if (started.compareAndSet(false, true)) {
+            // 加载持久化的delayOffset文件
             this.load();
+            // 初始化投递定时任务线程池
             this.deliverExecutorService = ThreadUtils.newScheduledThreadPool(this.maxDelayLevel, new ThreadFactoryImpl("ScheduleMessageTimerThread_"));
             if (this.enableAsyncDeliver) {
                 this.handleExecutorService = ThreadUtils.newScheduledThreadPool(this.maxDelayLevel, new ThreadFactoryImpl("ScheduleMessageExecutorHandleThread_"));
             }
+            // 初始化offsetTable并向线程池里添加定时任务（一个level对应一个任务）
             for (Map.Entry<Integer, Long> entry : this.delayLevelTable.entrySet()) {
                 Integer level = entry.getKey();
                 Long timeDelay = entry.getValue();
@@ -148,8 +154,10 @@ public class ScheduleMessageService extends ConfigManager {
 
                 if (timeDelay != null) {
                     if (this.enableAsyncDeliver) {
+                        // 该线程负责异步处理put结果，更新offsetTable等
                         this.handleExecutorService.schedule(new HandlePutResultTask(level), FIRST_DELAY_TIME, TimeUnit.MILLISECONDS);
                     }
+                    // 该线程池负责定时的不断地拉取消息尝试投递
                     this.deliverExecutorService.schedule(new DeliverDelayedMessageTimerTask(level, offset), FIRST_DELAY_TIME, TimeUnit.MILLISECONDS);
                 }
             }
@@ -231,6 +239,7 @@ public class ScheduleMessageService extends ConfigManager {
         return result;
     }
 
+    // 订正延迟队列的的offset
     public boolean correctDelayOffset() {
         try {
             for (int delayLevel : delayLevelTable.keySet()) {
@@ -397,6 +406,7 @@ public class ScheduleMessageService extends ConfigManager {
         }
 
         public void executeOnTimeUp() {
+            // 尝试获取queueId对应的延迟topic队列
             ConsumeQueueInterface cq =
                 ScheduleMessageService.this.brokerController.getMessageStore().getConsumeQueue(TopicValidator.RMQ_SYS_SCHEDULE_TOPIC,
                     delayLevel2QueueId(delayLevel));
@@ -447,6 +457,7 @@ public class ScheduleMessageService extends ConfigManager {
                     nextOffset = currOffset + cqUnit.getBatchNum();
 
                     long countdown = deliverTimestamp - now;
+                    // 还没到投递时间，不投递进行下一轮
                     if (countdown > 0) {
                         this.scheduleNextTimerTask(currOffset, DELAY_FOR_A_WHILE);
                         ScheduleMessageService.this.updateOffset(this.delayLevel, currOffset);
@@ -458,6 +469,7 @@ public class ScheduleMessageService extends ConfigManager {
                         continue;
                     }
 
+                    // 将msg的topic复原
                     MessageExtBrokerInner msgInner = ScheduleMessageService.this.messageTimeUp(msgExt);
                     if (TopicValidator.RMQ_SYS_TRANS_HALF_TOPIC.equals(msgInner.getTopic())) {
                         log.error("[BUG] the real topic of schedule msg is {}, discard the msg. msg={}",
@@ -467,8 +479,10 @@ public class ScheduleMessageService extends ConfigManager {
 
                     boolean deliverSuc;
                     if (ScheduleMessageService.this.enableAsyncDeliver) {
+                        // 异步方式进行消息的put，并在processesQueue里add一个PutResultProcess对象（封装了Future）
                         deliverSuc = this.asyncDeliver(msgInner, msgExt.getMsgId(), currOffset, offsetPy, sizePy);
                     } else {
+                        //
                         deliverSuc = this.syncDeliver(msgInner, msgExt.getMsgId(), currOffset, offsetPy, sizePy);
                     }
 
@@ -552,6 +566,7 @@ public class ScheduleMessageService extends ConfigManager {
             this.delayLevel = delayLevel;
         }
 
+        // 根据PutResultProcess的执行状态进行各种处理
         @Override
         public void run() {
             LinkedBlockingQueue<PutResultProcess> pendingQueue =

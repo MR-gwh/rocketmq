@@ -897,6 +897,7 @@ public class TimerMessageStore {
         if (!isRunningDequeue()) {
             return -1;
         }
+        // 读的时间大于了写的时间，说明没有新的数据需要读取
         if (currReadTimeMs >= currWriteTimeMs) {
             return -1;
         }

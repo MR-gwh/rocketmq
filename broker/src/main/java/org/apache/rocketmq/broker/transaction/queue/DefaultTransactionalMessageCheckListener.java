@@ -32,6 +32,7 @@ import org.apache.rocketmq.store.PutMessageStatus;
 
 import java.util.concurrent.ThreadLocalRandom;
 
+// 负责事务消息的状态检查，半事务消息长时间未确认和回滚时，主动发起消息给producer；当查询次数超过限制时会丢弃掉半消息（实际会移到系统队列TRANS_CHECK_MAXTIME_TOPIC里）
 public class DefaultTransactionalMessageCheckListener extends AbstractTransactionalMessageCheckListener {
     private static final Logger log = LoggerFactory.getLogger(LoggerName.TRANSACTION_LOGGER_NAME);
 

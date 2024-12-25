@@ -107,6 +107,7 @@ public class ReplicasInfoManager {
         this.syncStateSetInfoTable = new ConcurrentHashMap<String, SyncStateInfo>();
     }
 
+    // 添加broker到SyncStateSet里
     public ControllerResult<AlterSyncStateSetResponseHeader> alterSyncStateSet(
         final AlterSyncStateSetRequestHeader request, final SyncStateSet syncStateSet,
         final BrokerValidPredicate brokerAlivePredicate) {
@@ -114,6 +115,7 @@ public class ReplicasInfoManager {
         final ControllerResult<AlterSyncStateSetResponseHeader> result = new ControllerResult<>(new AlterSyncStateSetResponseHeader());
         final AlterSyncStateSetResponseHeader response = result.getResponse();
 
+        // 在controller里没有待alter broker相关的元数据
         if (!isContainsBroker(brokerName)) {
             result.setCodeAndRemark(ResponseCode.CONTROLLER_ALTER_SYNC_STATE_SET_FAILED, "Broker metadata is not existed");
             return result;
@@ -131,7 +133,7 @@ public class ReplicasInfoManager {
             return result;
         }
 
-        // Check master
+        // Check master 本地元数据缓存里记录的broker主从的master和请求带的master不一致，说明请求可能是过时的，不进行alter操作
         if (syncStateInfo.getMasterBrokerId() == null || !syncStateInfo.getMasterBrokerId().equals(request.getMasterBrokerId())) {
             String err = String.format("Rejecting alter syncStateSet request because the current leader is:{%s}, not {%s}",
                 syncStateInfo.getMasterBrokerId(), request.getMasterBrokerId());
@@ -140,7 +142,7 @@ public class ReplicasInfoManager {
             return result;
         }
 
-        // Check master epoch
+        // Check master epoch, 请求里的epoch和元数据维护的epoch不一致，可能是脑裂或者过时的请求，不进行处理
         if (request.getMasterEpoch() != syncStateInfo.getMasterEpoch()) {
             String err = String.format("Rejecting alter syncStateSet request because the current master epoch is:{%d}, not {%d}",
                 syncStateInfo.getMasterEpoch(), request.getMasterEpoch());
@@ -158,7 +160,7 @@ public class ReplicasInfoManager {
             return result;
         }
 
-        // Check newSyncStateSet correctness
+        // Check newSyncStateSet correctness, 当元数据里没有维护目标replica或判定replica是inactive时，不进行后续操作
         for (Long replica : newSyncStateSet) {
             if (!brokerReplicaInfo.isBrokerExist(replica)) {
                 String err = String.format("Rejecting alter syncStateSet request because the replicas {%s} don't exist", replica);
@@ -174,6 +176,7 @@ public class ReplicasInfoManager {
             }
         }
 
+        // 新的sync set里的master和controller维护的不一致，stop operate
         if (!newSyncStateSet.contains(syncStateInfo.getMasterBrokerId())) {
             String err = String.format("Rejecting alter syncStateSet request because the newSyncStateSet don't contains origin leader {%s}", syncStateInfo.getMasterBrokerId());
             LOGGER.error(err);
@@ -181,7 +184,7 @@ public class ReplicasInfoManager {
             return result;
         }
 
-        // Generate event
+        // Generate event, 本次操作被认为有效，生成alert事件后会被应用到状态机里
         int epoch = syncStateInfo.getSyncStateSetEpoch() + 1;
         response.setNewSyncStateSetEpoch(epoch);
         result.setBody(new SyncStateSet(newSyncStateSet, epoch).encode());
@@ -209,6 +212,7 @@ public class ReplicasInfoManager {
         Set<Long> allReplicaBrokers = controllerConfig.isEnableElectUncleanMaster() ? brokerReplicaInfo.getAllBroker() : null;
         Long newMaster = null;
 
+        // 第一次选举，直接取第一个作为replica作为master
         if (syncStateInfo.isFirstTimeForElect()) {
             // If never have a master in this broker set, in other words, it is the first time to elect a master
             // elect it as the first master
@@ -287,6 +291,7 @@ public class ReplicasInfoManager {
         return null;
     }
 
+    // 获取broker主从的下一个brokerId
     public ControllerResult<GetNextBrokerIdResponseHeader> getNextBrokerId(final GetNextBrokerIdRequestHeader request) {
         final String clusterName = request.getClusterName();
         final String brokerName = request.getBrokerName();
@@ -302,6 +307,7 @@ public class ReplicasInfoManager {
         return result;
     }
 
+    // 在主从里应用brokerId，实际会返回给event给machine，然后有machine路由到manager执行
     public ControllerResult<ApplyBrokerIdResponseHeader> applyBrokerId(final ApplyBrokerIdRequestHeader request) {
         final String clusterName = request.getClusterName();
         final String brokerName = request.getBrokerName();
@@ -331,6 +337,7 @@ public class ReplicasInfoManager {
         return result;
     }
 
+    // 注册broker? 实际看上去是更新broker，目标broker所在的主从不存在，或该broker不在目标主从时，都不会做什么。当发现broker的address发生变化时才会生成事件给machine执行
     public ControllerResult<RegisterBrokerToControllerResponseHeader> registerBroker(
         final RegisterBrokerToControllerRequestHeader request, final BrokerValidPredicate alivePredicate) {
         final String brokerAddress = request.getBrokerAddress();
@@ -365,6 +372,7 @@ public class ReplicasInfoManager {
         return result;
     }
 
+    // 获取指定broker主从的元数据
     public ControllerResult<GetReplicaInfoResponseHeader> getReplicaInfo(final GetReplicaInfoRequestHeader request) {
         final String brokerName = request.getBrokerName();
         final ControllerResult<GetReplicaInfoResponseHeader> result = new ControllerResult<>(new GetReplicaInfoResponseHeader());
@@ -384,6 +392,7 @@ public class ReplicasInfoManager {
         return result;
     }
 
+    // 获取broker集群 同步情况的元数据，并将集群replica分到了不同的同步状态集合里
     public ControllerResult<Void> getSyncStateData(final List<String> brokerNames,
         final BrokerValidPredicate brokerAlivePredicate) {
         final ControllerResult<Void> result = new ControllerResult<>();
@@ -422,6 +431,7 @@ public class ReplicasInfoManager {
         return result;
     }
 
+    // 清理broker的元数据，没有指定brokerId时，将整个brokerName下的broker元数据清除，否则只清除指定的broker元数据；允许指定是否清除还存活的broker的元数据
     public ControllerResult<Void> cleanBrokerData(final CleanControllerBrokerDataRequestHeader requestHeader,
         final BrokerValidPredicate validPredicate) {
         final ControllerResult<Void> result = new ControllerResult<>();
@@ -431,14 +441,17 @@ public class ReplicasInfoManager {
         final String brokerControllerIdsToClean = requestHeader.getBrokerControllerIdsToClean();
 
         Set<Long> brokerIdSet = null;
+        // 不清理还在存活状态的broker元数据时
         if (!requestHeader.isCleanLivingBroker()) {
             //if SyncStateInfo.masterAddress is not empty, at least one broker with the same BrokerName is alive
             SyncStateInfo syncStateInfo = this.syncStateSetInfoTable.get(brokerName);
+            // master还存活，不允许清除整个broker主从元数据
             if (StringUtils.isBlank(brokerControllerIdsToClean) && null != syncStateInfo && syncStateInfo.getMasterBrokerId() != null) {
                 String remark = String.format("Broker %s is still alive, clean up failure", requestHeader.getBrokerName());
                 result.setCodeAndRemark(ResponseCode.CONTROLLER_INVALID_CLEAN_BROKER_METADATA, remark);
                 return result;
             }
+            // 指定的brokerId对应的的broker里有alive的，不进行任何处理
             if (StringUtils.isNotBlank(brokerControllerIdsToClean)) {
                 try {
                     brokerIdSet = Stream.of(brokerControllerIdsToClean.split(";")).map(idStr -> Long.valueOf(idStr)).collect(Collectors.toSet());
@@ -465,6 +478,7 @@ public class ReplicasInfoManager {
         return result;
     }
 
+    // 扫描需要进行主从选举的broker集合：master inactive，主从里还有存活的broker
     public List<String/*BrokerName*/> scanNeedReelectBrokerSets(final BrokerValidPredicate validPredicate) {
         List<String> needReelectBrokerSets = new LinkedList<>();
         this.syncStateSetInfoTable.forEach((brokerName, syncStateInfo) -> {
@@ -511,6 +525,7 @@ public class ReplicasInfoManager {
         }
     }
 
+    // 实际做了更新broker主从信息的操作
     private void handleAlterSyncStateSet(final AlterSyncStateSetEvent event) {
         final String brokerName = event.getBrokerName();
         if (isContainsBroker(brokerName)) {
@@ -519,6 +534,7 @@ public class ReplicasInfoManager {
         }
     }
 
+    // 想replicaInfoTable里新增一个broker信息 （如果没有对应的主从元数据，就创建一个）
     private void handleApplyBrokerId(final ApplyBrokerIdEvent event) {
         final String brokerName = event.getBrokerName();
         if (isContainsBroker(brokerName)) {
@@ -539,6 +555,7 @@ public class ReplicasInfoManager {
         }
     }
 
+    // 更新指定broker的地址信息 （容器场景下，server重启会改变ip，但是因为持久化了brokerId，因此brokerId不会改变）
     private void handleUpdateBrokerAddress(final UpdateBrokerAddressEvent event) {
         final String brokerName = event.getBrokerName();
         final String brokerAddress = event.getBrokerAddress();
@@ -547,6 +564,7 @@ public class ReplicasInfoManager {
         brokerReplicaInfo.updateBrokerAddress(brokerId, brokerAddress);
     }
 
+    // 更新主从架构里的master broker：可能会发生master切换，也可能导致无主
     private void handleElectMaster(final ElectMasterEvent event) {
         final String brokerName = event.getBrokerName();
         final Long newMaster = event.getNewMasterBrokerId();
@@ -571,6 +589,7 @@ public class ReplicasInfoManager {
         LOGGER.error("Receive an ElectMasterEvent which contains the un-registered broker, event = {}", event);
     }
 
+    // 清除replicaInfoTable和syncStateSetInfoTable里的指定broker 元数据
     private void handleCleanBrokerDataEvent(final CleanBrokerDataEvent event) {
 
         final String brokerName = event.getBrokerName();

@@ -58,6 +58,7 @@ import org.apache.rocketmq.tieredstore.metadata.entity.TopicMetadata;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
+// 持久化和保存主题配置
 public class TopicConfigManager extends ConfigManager {
     protected static final Logger log = LoggerFactory.getLogger(LoggerName.BROKER_LOGGER_NAME);
     private static final long LOCK_TIMEOUT_MILLIS = 3000;
